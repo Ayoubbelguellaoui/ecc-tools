@@ -131,7 +131,7 @@ void DetailedRouter::routeDRModel(DRModel& dr_model)
   dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 0, 3, fixed_rect_unit, routed_rect_unit, violation_unit, 3, 10, 32);
   dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 4, 3, fixed_rect_unit, routed_rect_unit, violation_unit, 3, 10, 32);
   dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 8, 3, fixed_rect_unit, routed_rect_unit, violation_unit, 3, 10, 32);
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 0, 3, 2 * fixed_rect_unit, 2 * routed_rect_unit, 2 * violation_unit, 9, 10, 0);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 0, 3, 2 * fixed_rect_unit, 2 * routed_rect_unit, 2 * violation_unit, 9, 10);
   dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 4, 3, 2 * fixed_rect_unit, 2 * routed_rect_unit, 2 * violation_unit, 9, 10);
   dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 8, 3, 2 * fixed_rect_unit, 2 * routed_rect_unit, 2 * violation_unit, 9, 10);
   dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 0, 3, 4 * fixed_rect_unit, 4 * routed_rect_unit, 4 * violation_unit, 18, 10);
@@ -2785,6 +2785,9 @@ std::optional<int32_t> DetailedRouter::selectPatch(DRBox& dr_box, const GTLPolyI
   }
   std::optional<DETask> de_task;
   std::vector<Violation> origin_patch_violation_list;
+  std::optional<int32_t> best_candidate_idx;
+  size_t best_violation_num = std::numeric_limits<size_t>::max();
+  Direction layer_direction = routing_layer.get_prefer_direction();
   for (bool is_compact : {false, true}) {
     size_t patch_begin_idx = 0;
     if (is_compact) {
@@ -2814,8 +2817,16 @@ std::optional<int32_t> DetailedRouter::selectPatch(DRBox& dr_box, const GTLPolyI
       if (check_patch) {
         check_patch_list.pop_back();
       }
-      if (isPatchImprovement(dr_box, origin_patch_violation_list, curr_patch_violation_list)) {
-        return static_cast<int32_t>(patch_idx);
+      // Always retain the best legal candidate.  A patch is still useful when
+      // it cannot reduce the local violation count; in that case choose the
+      // candidate with the fewest violations and then the lowest geometric
+      // cost using the normal patch ordering.
+      size_t curr_violation_num = curr_patch_violation_list.size();
+      if (!best_candidate_idx || curr_violation_num < best_violation_num
+          || (curr_violation_num == best_violation_num
+              && CmpDRPatch()(candidate_patch_list[patch_idx], candidate_patch_list[*best_candidate_idx], layer_direction))) {
+        best_candidate_idx = static_cast<int32_t>(patch_idx);
+        best_violation_num = curr_violation_num;
       }
     }
   }
@@ -2823,8 +2834,7 @@ std::optional<int32_t> DetailedRouter::selectPatch(DRBox& dr_box, const GTLPolyI
     RTLOG.error(Loc::current(), "No ordinary or compact patch candidate for net ", dr_box.get_patch_state().get_curr_patch_task()->get_net_idx(), " on layer ",
                 layer_idx, "!");
   }
-  // Keep the violation for rerouting when no candidate passes the DRC improvement check.
-  return {};
+  return best_candidate_idx;
 }
 
 std::vector<DRPatch> DetailedRouter::getCandidatePatchList(DRBox& dr_box, const GTLPolyInt& patch_poly)
@@ -3888,7 +3898,7 @@ void DetailedRouter::addRouteViolationToGraph(DRBox& dr_box, Violation& violatio
       break;
     }
   }
-  addRouteViolationToGraph(dr_box, searched_rect, overlap_segment_list);
+  // addRouteViolationToGraph(dr_box, searched_rect, overlap_segment_list);
 }
 
 void DetailedRouter::addRouteViolationToGraph(DRBox& dr_box, LayerRect& searched_rect, std::vector<Segment<LayerCoord>>& overlap_segment_list)
