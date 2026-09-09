@@ -128,10 +128,10 @@ void DetailedRouter::routeDRModel(DRModel& dr_model)
    */
   std::vector<DRIterParam> dr_iter_param_list;
   // clang-format off
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 0, 3, fixed_rect_unit, routed_rect_unit, violation_unit, 3, 10, 0);
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 4, 3, fixed_rect_unit, routed_rect_unit, violation_unit, 3, 10, 64);
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 8, 3, fixed_rect_unit, routed_rect_unit, violation_unit, 3, 10, 64);
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 0, 3, 2 * fixed_rect_unit, 2 * routed_rect_unit, 2 * violation_unit, 9, 10, 64);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 0, 3, fixed_rect_unit, routed_rect_unit, violation_unit, 3, 10, 32);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 4, 3, fixed_rect_unit, routed_rect_unit, violation_unit, 3, 10, 32);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 8, 3, fixed_rect_unit, routed_rect_unit, violation_unit, 3, 10, 32);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 0, 3, 2 * fixed_rect_unit, 2 * routed_rect_unit, 2 * violation_unit, 9, 10, 0);
   dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 4, 3, 2 * fixed_rect_unit, 2 * routed_rect_unit, 2 * violation_unit, 9, 10);
   dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 8, 3, 2 * fixed_rect_unit, 2 * routed_rect_unit, 2 * violation_unit, 9, 10);
   dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 12, 0, 3, 4 * fixed_rect_unit, 4 * routed_rect_unit, 4 * violation_unit, 18, 10);
@@ -148,6 +148,7 @@ void DetailedRouter::routeDRModel(DRModel& dr_model)
     dr_model.get_previous_result() = dr_model.get_curr_result();
     // debugPlotDRModel(dr_model, "before");
     setDRIterParam(dr_model, iter, dr_iter_param_list[i]);
+    dr_model.set_refine_iter_param(i + 1 < static_cast<int32_t>(dr_iter_param_list.size()) ? dr_iter_param_list[i + 1] : DRIterParam());
     initDRBoxMap(dr_model);
     resetRoutingState(dr_model);
     buildBoxSchedule(dr_model);
@@ -178,7 +179,6 @@ void DetailedRouter::routeDRModel(DRModel& dr_model)
 
 void DetailedRouter::setDRIterParam(DRModel& dr_model, int32_t iter, DRIterParam& dr_iter_param)
 {
-  dr_model.set_previous_dr_iter_param(dr_model.get_dr_iter_param());
   dr_model.set_iter(iter);
   RTLOG.info(Loc::current(), "prefer_wire_unit: ", dr_iter_param.get_prefer_wire_unit());
   RTLOG.info(Loc::current(), "non_prefer_wire_unit: ", dr_iter_param.get_non_prefer_wire_unit());
@@ -264,6 +264,7 @@ void DetailedRouter::initDRBoxMap(DRModel& dr_model)
       dr_box.set_dr_iter_param(&dr_iter_param);
       dr_box.set_initial_routing(dr_model.get_initial_routing());
       dr_box.set_refine_enabled(dr_model.get_refine_enabled());
+      dr_box.set_refine_net_num(dr_model.get_refine_iter_param().get_refine_net_num());
       dr_box.set_dirty(false);
     }
   }
@@ -800,7 +801,7 @@ void DetailedRouter::addNetPatchToEnvironment(DRModel& dr_model, GridMap<bool>& 
 void DetailedRouter::initDRTaskList(DRModel& dr_model, DRBox& dr_box)
 {
   if (!dr_box.get_initial_routing() && dr_box.get_curr_result().get_route_violation_list().empty()
-      && dr_box.get_dr_iter_param()->get_refine_net_num() == 0) {
+      && dr_box.get_refine_net_num() == 0) {
     return;
   }
   // New conflicts during repair must be able to schedule their other local nets.
@@ -1151,7 +1152,7 @@ bool cmpRefineCandidate(const DRRefineCandidate& first, const DRRefineCandidate&
 
 void selectRefineNets(DRBox& dr_box, std::vector<DRRefineCandidate>& candidate_list)
 {
-  size_t selected_num = std::min(candidate_list.size(), static_cast<size_t>(dr_box.get_dr_iter_param()->get_refine_net_num()));
+  size_t selected_num = std::min(candidate_list.size(), static_cast<size_t>(dr_box.get_refine_net_num()));
   std::partial_sort(candidate_list.begin(), candidate_list.begin() + selected_num, candidate_list.end(), cmpRefineCandidate);
   std::vector<int32_t>& refine_net_list = dr_box.get_refine_net_list();
   refine_net_list.resize(selected_num);
@@ -1216,15 +1217,15 @@ void DetailedRouter::buildRefineTaskList(DRModel& dr_model, DRBox& dr_box)
 {
   std::vector<int32_t>& refine_net_list = dr_box.get_refine_net_list();
   refine_net_list.clear();
-  int32_t refine_net_num = dr_box.get_dr_iter_param()->get_refine_net_num();
+  const DRIterParam& refine_param = dr_model.get_refine_iter_param();
+  int32_t refine_net_num = dr_box.get_refine_net_num();
   if (dr_box.get_initial_routing() || refine_net_num == 0 || dr_box.get_dr_task_list().empty()) {
     return;
   }
-  const DRIterParam& previous_param = dr_model.get_previous_dr_iter_param();
-  int32_t size = previous_param.get_size();
-  int32_t offset = previous_param.get_offset();
-  if (dr_model.get_iter() <= 1 || size <= 0 || offset < 0 || offset >= size) {
-    RTLOG.error(Loc::current(), "The previous DR partition is invalid for refine!");
+  int32_t size = refine_param.get_size();
+  int32_t offset = refine_param.get_offset();
+  if (size <= 0 || offset < 0 || offset >= size) {
+    RTLOG.error(Loc::current(), "The refine partition is invalid!");
   }
   ScaleAxis& gcell_axis = RTDM.getDatabase().get_gcell_axis();
   const PlanarRect& box_rect = dr_box.get_box_rect().get_real_rect();
@@ -1935,7 +1936,7 @@ void DetailedRouter::routeDRBox(DRBox& dr_box)
     updateBestResult(dr_box);
     updateTaskSchedule(dr_box, net_route_order_list, routing_net_list);
   }
-  if (!dr_box.get_initial_routing() && dr_box.get_dr_iter_param()->get_refine_net_num() > 0) {
+  if (!dr_box.get_initial_routing() && dr_box.get_refine_net_num() > 0) {
     refineCleanNets(dr_box);
   }
 }
