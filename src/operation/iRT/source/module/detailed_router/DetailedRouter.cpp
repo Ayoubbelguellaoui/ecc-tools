@@ -3848,18 +3848,15 @@ void DetailedRouter::updateRoutedRectToGraph(DRBox& dr_box, ChangeType change_ty
 
 void DetailedRouter::addRouteViolationToGraph(DRBox& dr_box, Violation& violation)
 {
+  const std::set<int32_t>& violation_net_set = violation.get_violation_net_set();
+  if (violation_net_set.size() != 1 || *violation_net_set.begin() == 0) {
+    return;
+  }
   LayerRect searched_rect = violation.get_violation_shape().get_real_rect();
   std::vector<Segment<LayerCoord>> overlap_segment_list;
   std::set<int32_t> target_net_set;
   std::set<int32_t> found_net_set;
-  for (int32_t net_idx : violation.get_violation_net_set()) {
-    if (net_idx != -1) {
-      target_net_set.insert(net_idx);
-    }
-  }
-  if (target_net_set.empty()) {
-    return;
-  }
+  target_net_set.insert(*violation_net_set.begin());
   int32_t searched_times = 0;
   constexpr int32_t max_searched_times = 3;
   while (true) {
@@ -3898,7 +3895,7 @@ void DetailedRouter::addRouteViolationToGraph(DRBox& dr_box, Violation& violatio
       break;
     }
   }
-  // addRouteViolationToGraph(dr_box, searched_rect, overlap_segment_list);
+  addRouteViolationToGraph(dr_box, searched_rect, overlap_segment_list);
 }
 
 void DetailedRouter::addRouteViolationToGraph(DRBox& dr_box, LayerRect& searched_rect, std::vector<Segment<LayerCoord>>& overlap_segment_list)
