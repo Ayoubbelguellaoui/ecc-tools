@@ -6,6 +6,8 @@
 
 #include "AntennaEngine.hpp"
 
+#include <chrono>
+
 #include "ACModel.hpp"
 #include "AntennaChecker.hpp"
 #include "AntennaFixer.hpp"
@@ -190,8 +192,11 @@ AntennaResult AntennaEngine::checkAndFix(std::map<std::string, std::any> config_
   AntennaRuleEvaluator::initLayers(ac_model, design);
 
   int32_t prev_violation_count = result.get_violation_num();
+  int64_t total_signal_nets = static_cast<int64_t>(
+      design->get_net_list()->get_net_list().size());
 
   for (int32_t iter = 1; iter <= param.get_max_iter(); ++iter) {
+    auto iter_start = std::chrono::steady_clock::now();
     AFIterStat stat;
     stat.iter = iter;
     std::vector<ACViolation> current = result.get_violation_list();
@@ -244,7 +249,14 @@ AntennaResult AntennaEngine::checkAndFix(std::map<std::string, std::any> config_
     result.get_violation_list() = ac_model.get_violation_list();
     stat.violation_num = result.get_violation_num();
     result.get_iter_stat_list().push_back(stat);
-    ZHLOG.info(Loc::current(), "antenna fix iter ", iter, " remaining violations: ", stat.violation_num);
+
+    auto iter_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - iter_start).count();
+    ZHLOG.info(Loc::current(), "antenna fix iter ", iter,
+        " remaining violations: ", stat.violation_num,
+        " touched_nets: ", static_cast<int64_t>(touched.size()),
+        " total_signal_nets: ", total_signal_nets,
+        " elapsed_ms: ", iter_elapsed);
     if (stat.violation_num == 0) {
       break;
     }
