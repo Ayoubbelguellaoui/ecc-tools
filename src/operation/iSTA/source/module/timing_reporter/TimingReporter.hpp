@@ -103,7 +103,7 @@ class TimingReporter
   void outputLaunchClockInfo(std::ofstream* report_file, TimingPath& timing_path, DelayType delay_type, std::size_t label_width);
   std::string getLaunchClockEdgeText(TimingPath& timing_path, DelayType delay_type);
   void outputTimingLine(std::ofstream* report_file, std::string_view label, double incr, double path, bool has_incr, std::string transition,
-                        std::size_t label_width);
+                        std::size_t label_width, std::optional<std::size_t> fanout = std::nullopt);
   void outputTimingSummaryLine(std::ofstream* report_file, std::string label, double value, std::size_t label_width);
   std::string getClockName(TimingPath& timing_path);
   std::string_view getClockNetworkDelayLabel(TimingPath& timing_path);
@@ -112,6 +112,7 @@ class TimingReporter
   double getInputDelay(TimingPath& timing_path, DelayType delay_type);
   std::string getStartClockPin(TimingPath& timing_path);
   void outputTimingPoint(std::ofstream* report_file, TimingPath& timing_path, TimingPathPoint& path_point, bool is_first_point, std::size_t label_width);
+  std::optional<std::size_t> getPinFanout(const std::string& pin_name);
   std::string getNumberString(double value);
   std::string getPointLabel(TimingPathPoint& path_point);
   std::string getPTPinName(std::string& pin_name);
