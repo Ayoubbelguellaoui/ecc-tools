@@ -58,6 +58,13 @@ void ClockPropagator::propagate()
   CPModel cp_model = initCPModel();
   buildClockSourceList(cp_model);
   markClockPointList(cp_model);
+  for (CPClock& clock : cp_model.clock_list) {
+    TimingClock& definition = STADM.getDatabase().get_timing_constraint().get_clock_map().at(std::string(clock.get_clock_name()));
+    if (definition.get_is_generated() && clock.get_is_propagated() && !clock.get_clock_point_list().empty()) {
+      STALOG.error(Loc::current(), "propagated generated clock '", clock.get_clock_name(),
+                   "' requires master-to-target insertion delay support; this analysis currently supports ideal generated clocks");
+    }
+  }
   propagateClockArrival(cp_model);
   STALOG.info(Loc::current(), "Completed", monitor.getStatsInfo());
 }
@@ -135,6 +142,23 @@ void ClockPropagator::markClockPoint(CPClock& clock)
     std::string pin_name = pin_queue.front();
     pin_queue.pop();
 
+    Pin& pin = database.get_pin_map().at(pin_name);
+    // Multiple exported clock modes have no internal data fanout to analyze.
+    if (pin.get_is_port() && pin.get_direction() == PinDirection::kOutput && database.get_outgoing_arc_list_map()[pin_name].empty()) {
+      continue;
+    }
+    bool another_root = false;
+    for (auto& [name, definition] : database.get_timing_constraint().get_clock_map()) {
+      if (name != clock.get_clock_name()
+          && std::find(definition.get_source_list().begin(), definition.get_source_list().end(), pin_name) != definition.get_source_list().end()
+          && std::find(clock.get_source_list().begin(), clock.get_source_list().end(), pin_name) == clock.get_source_list().end()) {
+        another_root = true;
+        break;
+      }
+    }
+    if (another_root) {
+      continue;
+    }
     TimingPoint& timing_point = database.get_timing_point_map()[pin_name];
     if (is_clock_tree_overlap(timing_point, clock)) {
       STALOG.error(Loc::current(), "clock trees overlap at pin '", pin_name, "': '", timing_point.get_clock_name(), "' and '", clock.get_clock_name(), "'");
@@ -205,6 +229,7 @@ void ClockPropagator::seedPhysicalClockState(CPClock& clock)
 void ClockPropagator::updateEffectiveClockState(CPClock& clock)
 {
   Database& database = STADM.getDatabase();
+  TimingClock& definition = database.get_timing_constraint().get_clock_map().at(std::string(clock.get_clock_name()));
   for (const auto& pin_name : clock.get_clock_point_list()) {
     TimingPoint& timing_point = database.get_timing_point_map()[pin_name];
     if (clock.get_is_propagated()) {
@@ -219,7 +244,9 @@ void ClockPropagator::updateEffectiveClockState(CPClock& clock)
     for (AnalysisType analysis_type : {AnalysisType::kMax, AnalysisType::kMin}) {
       for (TransType trans_type : {TransType::kRise, TransType::kFall}) {
         timing_point.get_clock_arrival_map()[analysis_type][trans_type] = 0.0;
-        timing_point.get_clock_slew_map()[analysis_type][trans_type] = 0.0;
+        const auto mode = definition.get_transition_map().find(analysis_type);
+        timing_point.get_clock_slew_map()[analysis_type][trans_type]
+            = mode != definition.get_transition_map().end() && mode->second.contains(trans_type) ? mode->second.at(trans_type) : 0.0;
       }
     }
   }

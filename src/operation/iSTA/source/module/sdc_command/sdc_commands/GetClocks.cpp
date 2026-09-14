@@ -15,41 +15,29 @@
 // See the Mulan PSL v2 for more details.
 // ***************************************************************************************
 #include "DataManager.hpp"
-#include "Logger.hpp"
+#include "SdcCommandUtils.hpp"
 #include "SdcCommands.hpp"
 
 namespace ista::sdc {
 
 TclGetClocks::TclGetClocks(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
 {
-  addOption(new ecc::TclStringListOption("clocks", 1));
+  addOption(new ecc::TclStringOption("clocks", 1));
+  addOption(new ecc::TclSwitchOption("-quiet"));
+  addOption(new ecc::TclSwitchOption("-regexp"));
 }
 
 unsigned TclGetClocks::exec()
 {
-  ecc::TclOption* clock_option = getOptionOrArg("clocks");
-  if (!clock_option->is_set_val()) {
-    setTclError("get_clocks requires a clock list");
+  ecc::TclOption* objects = getOptionOrArg("clocks");
+  const bool regexp = getOptionOrArg("-regexp")->is_set_val();
+  const std::string patterns = objects->is_set_val() ? objects->getStringVal() : "*";
+  std::vector<std::string> result = queryObjects(STADM.getDatabase(), queryPatterns(patterns, regexp), QueryObjectType::kClock, regexp);
+  if (result.empty() && !getOptionOrArg("-quiet")->is_set_val()) {
+    setTclError("no clocks matched: " + patterns);
     return 0;
   }
-  const std::vector<std::string> clock_name_list = clock_option->getStringList();
-  if (clock_name_list.empty()) {
-    setTclError("get_clocks requires at least one clock name");
-    return 0;
-  }
-
-  auto& clock_map = STADM.getDatabase().get_timing_constraint().get_clock_map();
-  std::vector<std::string> resolved_clocks;
-  resolved_clocks.reserve(clock_name_list.size());
-  for (const std::string& clock_name : clock_name_list) {
-    if (!clock_map.contains(clock_name)) {
-      STALOG.error(Loc::current(), "clock '", clock_name, "' does not exist");
-      setTclError("clock does not exist");
-      return 0;
-    }
-    resolved_clocks.push_back(clock_name);
-  }
-  setResult(std::move(resolved_clocks));
+  setResult(std::move(result));
   return 1;
 }
 

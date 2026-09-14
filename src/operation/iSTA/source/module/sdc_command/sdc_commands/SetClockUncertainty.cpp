@@ -26,7 +26,7 @@ TclSetClockUncertainty::TclSetClockUncertainty(const char* cmd_name, ClientData 
   addOption(new ecc::TclSwitchOption("-setup"));
   addOption(new ecc::TclSwitchOption("-hold"));
   addOption(new ecc::TclDoubleOption("uncertainty", 1));
-  addOption(new ecc::TclStringListOption("clocks", 1));
+  addOption(new ecc::TclStringOption("clocks", 1));
 }
 
 unsigned TclSetClockUncertainty::exec()
@@ -46,25 +46,18 @@ unsigned TclSetClockUncertainty::exec()
     return 0;
   }
 
-  const std::vector<std::string> clock_list = clock_option->getStringList();
-  if (clock_list.empty()) {
-    setTclError("set_clock_uncertainty requires a clock collection");
-    return 0;
-  }
-  auto& clock_map = data_manager.getDatabase().get_timing_constraint().get_clock_map();
-  const auto clock_it = clock_map.find(clock_list.front());
-  if (clock_it == clock_map.end()) {
-    setTclError("clock '" + clock_list.front() + "' does not exist");
-    return 0;
-  }
-
+  Database& database = data_manager.getDatabase();
+  const std::set<std::string> clocks = resolveClockObjects(database, queryPatterns(clock_option->getStringVal(), false));
   const bool setup = getOptionOrArg("-setup")->is_set_val();
   const bool hold = getOptionOrArg("-hold")->is_set_val();
-  if (!hold || setup) {
-    clock_it->second.set_setup_uncertainty(uncertainty);
-  }
-  if (!setup || hold) {
-    clock_it->second.set_hold_uncertainty(uncertainty);
+  for (const std::string& name : clocks) {
+    TimingClock& clock = database.get_timing_constraint().get_clock_map().at(name);
+    if (!hold || setup) {
+      clock.set_setup_uncertainty(uncertainty);
+    }
+    if (!setup || hold) {
+      clock.set_hold_uncertainty(uncertainty);
+    }
   }
   return 1;
 }

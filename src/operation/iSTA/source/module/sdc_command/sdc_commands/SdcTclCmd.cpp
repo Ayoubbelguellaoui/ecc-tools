@@ -32,7 +32,7 @@ int SdcTclCmd::execute(Tcl_Interp* interp, int objc, Tcl_Obj* const objv[])
   for (int index = 1; index < objc; ++index) {
     const char* value = Tcl_GetString(objv[index]);
     if (next_is_option_value) {
-      current_option->setVal(value);
+      setOptionValue(current_option, value);
       next_is_option_value = false;
       continue;
     }
@@ -54,7 +54,7 @@ int SdcTclCmd::execute(Tcl_Interp* interp, int objc, Tcl_Obj* const objv[])
       setInterpreterError(interp);
       return TCL_ERROR;
     }
-    argument->setVal(value);
+    setOptionValue(argument, value);
   }
 
   if (next_is_option_value) {
@@ -89,6 +89,21 @@ int SdcTclCmd::execute(Tcl_Interp* interp, int objc, Tcl_Obj* const objv[])
     Tcl_SetObjResult(interp, Tcl_NewStringObj(_result.c_str(), static_cast<int>(_result.size())));
   }
   return TCL_OK;
+}
+
+void SdcTclCmd::setOptionValue(ecc::TclOption* option, const char* value)
+{
+  if (option->isDoubleOption()) {
+    double number = 0.0;
+    if (Tcl_GetDouble(nullptr, value, &number) != TCL_OK || !std::isfinite(number)) {
+      throw std::invalid_argument(std::string(option->get_option_name()) + " requires a finite number: " + value);
+    }
+    std::ostringstream number_stream;
+    number_stream << std::setprecision(std::numeric_limits<double>::max_digits10) << number;
+    option->setVal(number_stream.str().c_str());
+    return;
+  }
+  option->setVal(value);
 }
 
 void SdcTclCmd::setResult(std::string result)

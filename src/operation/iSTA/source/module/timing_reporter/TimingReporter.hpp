@@ -56,6 +56,8 @@ class TimingReporter
   std::vector<TimingPath*> getSortedTimingPathList(TimingPathGroup& timing_path_group, DelayType delay_type, StartEndType start_end_type);
   std::vector<TimingPath*> getEndpointWorstTimingPathList(std::vector<TimingPath*>& timing_path_list);
   bool isMatchReportSlack(TimingPath& timing_path);
+  void outputFanoutReport();
+  int32_t getFanoutViolationNum();
   void outputQorSummaryReport();
   std::string getQorSummaryReportFilePath();
   std::string getQorSummaryJsonFilePath();

@@ -20,21 +20,22 @@
 
 namespace ista::sdc {
 
-TclGetPorts::TclGetPorts(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
+TclGetPins::TclGetPins(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
 {
-  addOption(new ecc::TclStringOption("ports", 1));
+  addOption(new ecc::TclStringOption("pins", 1));
   addOption(new ecc::TclSwitchOption("-quiet"));
   addOption(new ecc::TclSwitchOption("-regexp"));
+  addOption(new ecc::TclSwitchOption("-hierarchical"));
 }
 
-unsigned TclGetPorts::exec()
+unsigned TclGetPins::exec()
 {
-  ecc::TclOption* objects = getOptionOrArg("ports");
+  ecc::TclOption* objects = getOptionOrArg("pins");
   const bool regexp = getOptionOrArg("-regexp")->is_set_val();
   const std::string patterns = objects->is_set_val() ? objects->getStringVal() : "*";
-  std::vector<std::string> result = queryObjects(STADM.getDatabase(), queryPatterns(patterns, regexp), QueryObjectType::kPort, regexp);
+  std::vector<std::string> result = queryObjects(STADM.getDatabase(), queryPatterns(patterns, regexp), QueryObjectType::kPin, regexp);
   if (result.empty() && !getOptionOrArg("-quiet")->is_set_val()) {
-    setTclError("no ports matched: " + patterns);
+    setTclError("no pins matched: " + patterns);
     return 0;
   }
   setResult(std::move(result));
