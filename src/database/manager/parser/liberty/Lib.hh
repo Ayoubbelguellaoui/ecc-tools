@@ -552,6 +552,8 @@ class LibPort : public LibObject
   LibPort(LibPort&& other) noexcept;
   LibPort& operator=(LibPort&& rhs) noexcept;
 
+  void inheritBusAttributes(const LibPort& bus);
+
   const char* get_port_name() { return _port_name.c_str(); }
   void set_ower_cell(LibCell* ower_cell) { _ower_cell = ower_cell; }
   LibCell* get_ower_cell() { return _ower_cell; }
@@ -715,11 +717,12 @@ class LibPortBus : public LibPort
   void addlibertyPort(std::unique_ptr<LibPort>&& port) { _ports.push_back(std::move(port)); }
 
   auto getBusSize() { return _bus_type ? _bus_type->get_bit_width() : _ports.size(); }
+  auto& get_ports() { return _ports; }
 
   void set_bus_type(LibType* bus_type) { _bus_type = bus_type; }
   auto* get_bus_type() { return _bus_type; }
 
-  LibPort* operator[](int index) { return _ports.empty() ? this : _ports[index].get(); }
+  LibPort* operator[](int index);
 
  private:
   absl::InlinedVector<std::unique_ptr<LibPort>, 64> _ports;  //!< The bus ports.
