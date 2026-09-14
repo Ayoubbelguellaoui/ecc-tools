@@ -309,6 +309,10 @@ void DataManager::readConstraint()
   database.get_timing_constraint().get_clock_map().clear();
   database.get_timing_constraint().get_port_constraint_map().clear();
   database.get_timing_constraint().get_case_analysis_map().clear();
+  database.get_timing_constraint().get_false_path_list().clear();
+  database.get_timing_constraint().get_clock_group_list().clear();
+  database.get_timing_constraint().get_max_fanout().reset();
+  database.get_timing_constraint().get_port_max_fanout_map().clear();
   if (sdc_file_path.empty()) {
     return;
   }
@@ -318,6 +322,7 @@ void DataManager::readConstraint()
     for (const SdcError& error : sdc_command.getErrors()) {
       STALOG.warn(Loc::current(), "SDC command failed in '", sdc_file_path, "' at line ", error.line_number, ": ", error.message);
     }
+    STALOG.error(Loc::current(), "SDC contains invalid or unsupported constraints; timing analysis stopped");
   }
 }
 

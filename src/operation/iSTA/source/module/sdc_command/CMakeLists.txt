@@ -1,4 +1,13 @@
 add_library(ista_sdc_command
+    ${ISTA_MODULE}/sdc_command/sdc_commands/CurrentDesign.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/RemoveFromCollection.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/SetClockTransition.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/SetMaxFanout.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/CreateGeneratedClock.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/GetPins.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/AllPorts.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/SetClockGroups.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/SetFalsePath.cpp
     ${ISTA_MODULE}/sdc_command/SdcCommand.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SdcTclCmd.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SdcCommandUtils.cpp

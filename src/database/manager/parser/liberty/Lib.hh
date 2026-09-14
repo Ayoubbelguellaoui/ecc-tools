@@ -606,6 +606,8 @@ class LibPort : public LibObject
 
   void set_fanout_load(double fanout_load_val) { _fanout_load = fanout_load_val; }
   auto& get_fanout_load() { return _fanout_load; }
+  void set_max_fanout(double max_fanout) { _max_fanout = max_fanout; }
+  auto& get_max_fanout() { return _max_fanout; }
 
   double driveResistance();
 
@@ -635,6 +637,7 @@ class LibPort : public LibObject
   std::array<std::optional<double>, MODE_SPLIT> _slew_limits{};
 
   std::optional<double> _fanout_load;
+  std::optional<double> _max_fanout;
 
   absl::InlinedVector<std::unique_ptr<LibInternalPowerInfo>, 64> _internal_powers;  //!< The internal power information.
 

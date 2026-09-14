@@ -42,6 +42,8 @@ class TimingAnalyzer
   TimingAnalyzer& operator=(const TimingAnalyzer& other) = delete;
   TimingAnalyzer& operator=(TimingAnalyzer&& other) = delete;
   // function
+  void analyzeFanoutConstraints();
+  TimingCellPort* getFanoutCellPort(Pin& pin);
   TAModel initTAModel();
   bool isDisableArc(Arc& arc);
   bool shouldStopDataPropagation(Arc& arc);
@@ -84,6 +86,7 @@ class TimingAnalyzer
   AnalysisType getCaptureAnalysisType(AnalysisType analysis_type);
   TransType getClockTransType(TimingCheckArc& timing_check_arc);
   double getEndPointCaptureTime(std::string& end_point, AnalysisType analysis_type);
+  double getEndPointCaptureTime(std::string& start_point, std::string& end_point, AnalysisType analysis_type);
   double getEndPointClockArrival(std::string& end_point, AnalysisType analysis_type);
   double getEndPointClockArrival(std::string& end_point, AnalysisType analysis_type, TransType trans_type);
   double getClockReconvergencePessimism(TimingPathState& end_path_state, std::string& end_point, AnalysisType analysis_type, std::string& common_pin_name);
