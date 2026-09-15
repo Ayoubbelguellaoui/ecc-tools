@@ -4253,7 +4253,6 @@ void DetailedRouter::updateSummary(DRModel& dr_model)
   int32_t micron_dbu = RTDM.getDatabase().get_micron_dbu();
   std::vector<std::vector<ViaMaster>>& layer_via_master_list = RTDM.getDatabase().get_layer_via_master_list();
   Summary& summary = RTDM.getDatabase().get_summary();
-  int32_t enable_timing = RTDM.getConfig().enable_timing;
 
   std::map<int32_t, double>& routing_wire_length_map = summary.iter_dr_summary_map[dr_model.get_iter()].routing_wire_length_map;
   double& total_wire_length = summary.iter_dr_summary_map[dr_model.get_iter()].total_wire_length;
@@ -4263,9 +4262,6 @@ void DetailedRouter::updateSummary(DRModel& dr_model)
   int32_t& total_patch_num = summary.iter_dr_summary_map[dr_model.get_iter()].total_patch_num;
   std::map<int32_t, int32_t>& routing_violation_num_map = summary.iter_dr_summary_map[dr_model.get_iter()].routing_violation_num_map;
   int32_t& total_violation_num = summary.iter_dr_summary_map[dr_model.get_iter()].total_violation_num;
-  std::map<std::string, std::map<std::string, double>>& clock_timing_map = summary.iter_dr_summary_map[dr_model.get_iter()].clock_timing_map;
-
-  std::vector<DRNet>& dr_net_list = dr_model.get_dr_net_list();
 
   routing_wire_length_map.clear();
   total_wire_length = 0;
@@ -4275,7 +4271,6 @@ void DetailedRouter::updateSummary(DRModel& dr_model)
   total_patch_num = 0;
   routing_violation_num_map.clear();
   total_violation_num = 0;
-  clock_timing_map.clear();
 
   for (auto& [net_idx, segment_list] : dr_model.get_curr_result().get_net_detailed_result_map()) {
     for (Segment<LayerCoord>& segment : segment_list) {
@@ -4307,23 +4302,6 @@ void DetailedRouter::updateSummary(DRModel& dr_model)
     routing_violation_num_map[violation.get_violation_shape().get_layer_idx()]++;
     total_violation_num++;
   }
-  if (enable_timing) {
-    std::vector<std::map<std::string, std::vector<LayerCoord>>> real_pin_coord_map_list;
-    real_pin_coord_map_list.resize(dr_net_list.size());
-    std::vector<std::vector<Segment<LayerCoord>>> routing_segment_list_list;
-    routing_segment_list_list.resize(dr_net_list.size());
-    for (DRNet& dr_net : dr_net_list) {
-      for (DRPin& dr_pin : dr_net.get_dr_pin_list()) {
-        real_pin_coord_map_list[dr_net.get_net_idx()][dr_pin.get_pin_name()].push_back(dr_pin.get_access_point().getRealLayerCoord());
-      }
-    }
-    for (auto& [net_idx, segment_list] : dr_model.get_curr_result().get_net_detailed_result_map()) {
-      for (Segment<LayerCoord>& segment : segment_list) {
-        routing_segment_list_list[net_idx].emplace_back(segment.get_first(), segment.get_second());
-      }
-    }
-    RTI.updateTiming(real_pin_coord_map_list, routing_segment_list_list, clock_timing_map);
-  }
 }
 
 void DetailedRouter::printSummary(DRModel& dr_model)
@@ -4331,7 +4309,6 @@ void DetailedRouter::printSummary(DRModel& dr_model)
   std::vector<RoutingLayer>& routing_layer_list = RTDM.getDatabase().get_routing_layer_list();
   std::vector<CutLayer>& cut_layer_list = RTDM.getDatabase().get_cut_layer_list();
   Summary& summary = RTDM.getDatabase().get_summary();
-  int32_t enable_timing = RTDM.getConfig().enable_timing;
 
   std::map<int32_t, double>& routing_wire_length_map = summary.iter_dr_summary_map[dr_model.get_iter()].routing_wire_length_map;
   double& total_wire_length = summary.iter_dr_summary_map[dr_model.get_iter()].total_wire_length;
@@ -4341,7 +4318,6 @@ void DetailedRouter::printSummary(DRModel& dr_model)
   int32_t& total_patch_num = summary.iter_dr_summary_map[dr_model.get_iter()].total_patch_num;
   std::map<int32_t, int32_t>& routing_violation_num_map = summary.iter_dr_summary_map[dr_model.get_iter()].routing_violation_num_map;
   int32_t& total_violation_num = summary.iter_dr_summary_map[dr_model.get_iter()].total_violation_num;
-  std::map<std::string, std::map<std::string, double>>& clock_timing_map = summary.iter_dr_summary_map[dr_model.get_iter()].clock_timing_map;
 
   fort::char_table routing_wire_length_map_table;
   {
@@ -4392,20 +4368,8 @@ void DetailedRouter::printSummary(DRModel& dr_model)
     routing_violation_num_map_table << fort::header << "Total" << total_violation_num << RTUTIL.getPercentage(total_violation_num, total_violation_num)
                                     << fort::endr;
   }
-  fort::char_table timing_table;
-  timing_table.set_cell_text_align(fort::text_align::right);
-  if (enable_timing) {
-    timing_table << fort::header << "clock_name"
-                 << "tns"
-                 << "wns"
-                 << "freq" << fort::endr;
-    for (auto& [clock_name, timing_map] : clock_timing_map) {
-      timing_table << clock_name << timing_map["TNS"] << timing_map["WNS"] << timing_map["Freq(MHz)"] << fort::endr;
-    }
-  }
   RTUTIL.printTableList({routing_wire_length_map_table, cut_via_num_map_table, routing_patch_num_map_table});
   RTUTIL.printTableList({routing_violation_num_map_table});
-  RTUTIL.printTableList({timing_table});
 }
 
 void DetailedRouter::outputNetCSV(DRModel& dr_model)

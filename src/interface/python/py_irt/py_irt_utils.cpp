@@ -107,8 +107,6 @@ bool initConfigMapByJSON(const std::string& config, std::map<std::string, std::a
   config_map.insert(std::make_pair("-top_routing_layer", value));
   value = ecc::getJsonData(json, {"RT", "-thread_number"});
   config_map.insert(std::make_pair("-thread_number", std::stoi(value)));
-  value = ecc::getJsonData(json, {"RT", "-enable_timing"});
-  config_map.insert(std::make_pair("-enable_timing", std::stoi(value)));
   value = ecc::getJsonData(json, {"RT", "-output_inter_result"});
   config_map.insert(std::make_pair("-output_inter_result", std::stoi(value)));
   if (json.contains("RT") && json["RT"].contains("-enable_fast_mode")) {
