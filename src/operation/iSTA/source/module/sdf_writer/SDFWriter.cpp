@@ -554,10 +554,19 @@ void SDFWriter::outputSDFPeriodTimingCheck(std::ofstream* sdf_file, Instance& in
     return;
   }
   std::string port_name = getSDFPortName(database.get_pin_map()[pin_name]);
+  std::string condition = getSDFCondition(timing_arc);
   double min_delay = getSDFTimingCheckDelay(instance, timing_check_arc, timing_arc, AnalysisType::kMin, TransType::kRise);
   double max_delay = getSDFTimingCheckDelay(instance, timing_check_arc, timing_arc, AnalysisType::kMax, TransType::kRise);
 
-  (*sdf_file) << "    (PERIOD " << port_name << " ";
+  (*sdf_file) << "    (PERIOD ";
+  if (!condition.empty()) {
+    (*sdf_file) << "(COND " << condition << " ";
+  }
+  (*sdf_file) << port_name;
+  if (!condition.empty()) {
+    (*sdf_file) << ")";
+  }
+  (*sdf_file) << " ";
   outputSDFTriple(sdf_file, min_delay, max_delay);
   (*sdf_file) << ")\n";
 }
