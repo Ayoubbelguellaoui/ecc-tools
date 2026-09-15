@@ -1437,22 +1437,16 @@ void PlanarRouter::uploadNetList(PRModel& pr_model, const std::vector<PRNet*>& p
 void PlanarRouter::updateSummary(PRModel& pr_model)
 {
   int32_t micron_dbu = RTDM.getDatabase().get_micron_dbu();
-  ScaleAxis& gcell_axis = RTDM.getDatabase().get_gcell_axis();
   GridMap<PlanarRect>& gcell_map = RTDM.getDatabase().get_gcell_map();
   Summary& summary = RTDM.getDatabase().get_summary();
-  int32_t enable_timing = RTDM.getConfig().enable_timing;
 
   double& total_demand = summary.pr_summary.total_demand;
   double& total_overflow = summary.pr_summary.total_overflow;
   double& total_wire_length = summary.pr_summary.total_wire_length;
-  std::map<std::string, std::map<std::string, double>>& clock_timing_map = summary.pr_summary.clock_timing_map;
-
-  std::vector<PRNet>& pr_net_list = pr_model.get_pr_net_list();
 
   total_demand = 0;
   total_overflow = 0;
   total_wire_length = 0;
-  clock_timing_map.clear();
 
   for (GridMap<RoutingEdge>* routing_edge_map : {&RTDM.getDatabase().get_planar_routing_h_edge_map(), &RTDM.getDatabase().get_planar_routing_v_edge_map()}) {
     for (int32_t x = 0; x < routing_edge_map->get_x_size(); x++) {
@@ -1481,41 +1475,15 @@ void PlanarRouter::updateSummary(PRModel& pr_model)
       }
     }
   }
-  if (enable_timing) {
-    std::vector<std::map<std::string, std::vector<LayerCoord>>> real_pin_coord_map_list;
-    real_pin_coord_map_list.resize(pr_net_list.size());
-    std::vector<std::vector<Segment<LayerCoord>>> routing_segment_list_list;
-    routing_segment_list_list.resize(pr_net_list.size());
-    for (PRNet& pr_net : pr_net_list) {
-      for (PRPin& pr_pin : pr_net.get_pr_pin_list()) {
-        LayerCoord layer_coord = pr_pin.get_access_point().getGridLayerCoord();
-        real_pin_coord_map_list[pr_net.get_net_idx()][pr_pin.get_pin_name()].emplace_back(RTUTIL.getRealRectByGCell(layer_coord, gcell_axis).getMidPoint(), 0);
-      }
-    }
-    for (auto& [net_idx, segment_set] : pr_model.get_net_global_result_map()) {
-      for (Segment<LayerCoord>& segment_value : segment_set) {
-        Segment<LayerCoord>* segment = &segment_value;
-        LayerCoord first_layer_coord = segment->get_first();
-        LayerCoord first_real_coord(RTUTIL.getRealRectByGCell(first_layer_coord, gcell_axis).getMidPoint(), first_layer_coord.get_layer_idx());
-        LayerCoord second_layer_coord = segment->get_second();
-        LayerCoord second_real_coord(RTUTIL.getRealRectByGCell(second_layer_coord, gcell_axis).getMidPoint(), second_layer_coord.get_layer_idx());
-
-        routing_segment_list_list[net_idx].emplace_back(first_real_coord, second_real_coord);
-      }
-    }
-    RTI.updateTiming(real_pin_coord_map_list, routing_segment_list_list, clock_timing_map);
-  }
 }
 
 void PlanarRouter::printSummary(PRModel& pr_model)
 {
   Summary& summary = RTDM.getDatabase().get_summary();
-  int32_t enable_timing = RTDM.getConfig().enable_timing;
 
   double& total_demand = summary.pr_summary.total_demand;
   double& total_overflow = summary.pr_summary.total_overflow;
   double& total_wire_length = summary.pr_summary.total_wire_length;
-  std::map<std::string, std::map<std::string, double>>& clock_timing_map = summary.pr_summary.clock_timing_map;
 
   fort::char_table summary_table;
   {
@@ -1524,19 +1492,7 @@ void PlanarRouter::printSummary(PRModel& pr_model)
     summary_table << fort::header << "total_overflow" << total_overflow << fort::endr;
     summary_table << fort::header << "total_wire_length" << total_wire_length << fort::endr;
   }
-  fort::char_table timing_table;
-  timing_table.set_cell_text_align(fort::text_align::right);
-  if (enable_timing) {
-    timing_table << fort::header << "clock_name"
-                 << "tns"
-                 << "wns"
-                 << "freq" << fort::endr;
-    for (auto& [clock_name, timing_map] : clock_timing_map) {
-      timing_table << clock_name << timing_map["TNS"] << timing_map["WNS"] << timing_map["Freq(MHz)"] << fort::endr;
-    }
-  }
   RTUTIL.printTableList({summary_table});
-  RTUTIL.printTableList({timing_table});
 }
 
 void PlanarRouter::outputGuide(PRModel& pr_model)
