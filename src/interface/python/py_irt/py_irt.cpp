@@ -65,10 +65,4 @@ bool destroyRT()
   return true;
 }
 
-bool cleanDef()
-{
-  RTI.cleanDef();
-  return true;
-}
-
 }  // namespace python_interface

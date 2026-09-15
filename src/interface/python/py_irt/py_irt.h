@@ -24,6 +24,5 @@ bool initRT(std::string& config, std::map<std::string, std::string>& config_dict
 bool runERT(std::string& config, std::map<std::string, std::string>& config_dict);
 bool runRT();
 bool destroyRT();
-bool cleanDef();
 
 }  // namespace python_interface

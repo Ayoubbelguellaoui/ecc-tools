@@ -81,7 +81,6 @@ class RTInterface
   void runERT(std::map<std::string, std::any> config_map);
   void runRT();
   void destroyRT();
-  void cleanDef();
 #endif
 
 #endif
