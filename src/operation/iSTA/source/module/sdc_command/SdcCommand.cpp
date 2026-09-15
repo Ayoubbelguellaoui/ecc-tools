@@ -43,6 +43,12 @@ void SdcCommand::destroyInst()
 SdcCommand::SdcCommand()
 {
   _interp = Tcl_CreateInterp();
+  if (Tcl_Init(_interp) != TCL_OK) {
+    const std::string message = Tcl_GetStringResult(_interp);
+    Tcl_DeleteInterp(_interp);
+    _interp = nullptr;
+    throw std::runtime_error("failed to initialize SDC Tcl interpreter: " + message);
+  }
 }
 
 SdcCommand::~SdcCommand()

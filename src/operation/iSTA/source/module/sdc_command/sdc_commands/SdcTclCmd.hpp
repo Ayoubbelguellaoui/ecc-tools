@@ -30,6 +30,7 @@ class SdcTclCmd : public ecc::TclCmd
   int execute(Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]);
 
  protected:
+  void setOptionValue(ecc::TclOption* option, const char* value);
   void setTclError(std::string error_message) { _error_message = std::move(error_message); }
   void setResult(std::string result);
   void setResult(std::vector<std::string> result);
@@ -56,8 +57,13 @@ int executeTclCommand(ClientData client_data, Tcl_Interp* interp, int objc, Tcl_
     return TCL_ERROR;
   }
 
-  Command command(Tcl_GetString(objv[0]), client_data);
-  return command.execute(interp, objc, objv);
+  try {
+    Command command(Tcl_GetString(objv[0]), client_data);
+    return command.execute(interp, objc, objv);
+  } catch (const std::exception& error) {
+    Tcl_SetObjResult(interp, Tcl_NewStringObj(error.what(), -1));
+    return TCL_ERROR;
+  }
 }
 
 }  // namespace ista::sdc

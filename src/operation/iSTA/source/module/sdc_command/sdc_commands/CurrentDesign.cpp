@@ -20,24 +20,20 @@
 
 namespace ista::sdc {
 
-TclGetPorts::TclGetPorts(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
+TclCurrentDesign::TclCurrentDesign(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
 {
-  addOption(new ecc::TclStringOption("ports", 1));
-  addOption(new ecc::TclSwitchOption("-quiet"));
-  addOption(new ecc::TclSwitchOption("-regexp"));
+  addOption(new ecc::TclStringOption("design", 1));
 }
 
-unsigned TclGetPorts::exec()
+unsigned TclCurrentDesign::exec()
 {
-  ecc::TclOption* objects = getOptionOrArg("ports");
-  const bool regexp = getOptionOrArg("-regexp")->is_set_val();
-  const std::string patterns = objects->is_set_val() ? objects->getStringVal() : "*";
-  std::vector<std::string> result = queryObjects(STADM.getDatabase(), queryPatterns(patterns, regexp), QueryObjectType::kPort, regexp);
-  if (result.empty() && !getOptionOrArg("-quiet")->is_set_val()) {
-    setTclError("no ports matched: " + patterns);
+  const std::string& design = STADM.getDatabase().get_design_name();
+  ecc::TclOption* option = getOptionOrArg("design");
+  if (option->is_set_val() && (design.empty() || design != option->getStringVal())) {
+    setTclError("current_design can only select the loaded design '" + design + "'");
     return 0;
   }
-  setResult(std::move(result));
+  setResult(design.empty() ? std::vector<std::string>{} : std::vector<std::string>{design});
   return 1;
 }
 

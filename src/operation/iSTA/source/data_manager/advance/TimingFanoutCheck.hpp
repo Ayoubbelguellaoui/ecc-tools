@@ -16,23 +16,33 @@
 // ***************************************************************************************
 #pragma once
 
-#include "Database.hpp"
 #include "STAHeader.hpp"
-namespace ista::sdc {
 
-enum class QueryObjectType
+namespace ista {
+
+class TimingFanoutCheck
 {
-  kPort,
-  kPin,
-  kClock,
-  kAny
+ public:
+  TimingFanoutCheck() = default;
+  ~TimingFanoutCheck() = default;
+  // getter
+  const std::string& get_net_name() const { return _net_name; }
+  const std::string& get_driver_pin() const { return _driver_pin; }
+  double get_fanout_load() const { return _fanout_load; }
+  double get_limit() const { return _limit; }
+  double get_slack() const { return _limit - _fanout_load; }
+  // setter
+  void set_net_name(const std::string& net_name) { _net_name = net_name; }
+  void set_driver_pin(const std::string& driver_pin) { _driver_pin = driver_pin; }
+  void set_fanout_load(double fanout_load) { _fanout_load = fanout_load; }
+  void set_limit(double limit) { _limit = limit; }
+  // function
+
+ private:
+  std::string _net_name;
+  std::string _driver_pin;
+  double _fanout_load = 0.0;
+  double _limit = 0.0;
 };
-std::vector<std::string> queryPatterns(const std::string& text, bool regexp);
-std::vector<std::string> queryObjects(Database& database, const std::vector<std::string>& patterns, QueryObjectType type, bool regexp = false);
-std::set<std::string> resolveClockObjects(Database& database, const std::vector<std::string>& objects);
-std::set<std::string> resolveExceptionObjects(Database& database, const std::vector<std::string>& objects);
 
-std::vector<std::string> resolveObjectList(Database& database, const std::vector<std::string>& object_list);
-TimingPortConstraint& getPortConstraint(Database& database, const std::string& port_name);
-
-}  // namespace ista::sdc
+}  // namespace ista

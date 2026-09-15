@@ -91,6 +91,10 @@ void STAInterface::initSTA(std::map<std::string, std::any> config_map)
   STADM.input(config_map);
   DelayCalculator::initInst();
   SdcCommand::initInst({
+      {"current_design", sdc::executeTclCommand<sdc::TclCurrentDesign>},
+      {"remove_from_collection", sdc::executeTclCommand<sdc::TclRemoveFromCollection>},
+      {"set_clock_transition", sdc::executeTclCommand<sdc::TclSetClockTransition>},
+      {"set_max_fanout", sdc::executeTclCommand<sdc::TclSetMaxFanout>},
       {"set_case_analysis", sdc::executeTclCommand<sdc::TclSetCaseAnalysis>},
       {"set_input_delay", sdc::executeTclCommand<sdc::TclSetInputDelay>},
       {"set_output_delay", sdc::executeTclCommand<sdc::TclSetOutputDelay>},
@@ -102,6 +106,12 @@ void STAInterface::initSTA(std::map<std::string, std::any> config_map)
       {"get_port", sdc::executeTclCommand<sdc::TclGetPorts>},
       {"get_ports", sdc::executeTclCommand<sdc::TclGetPorts>},
       {"create_clock", sdc::executeTclCommand<sdc::TclCreateClock>},
+      {"create_generated_clock", sdc::executeTclCommand<sdc::TclCreateGeneratedClock>},
+      {"set_clock_groups", sdc::executeTclCommand<sdc::TclSetClockGroups>},
+      {"set_false_path", sdc::executeTclCommand<sdc::TclSetFalsePath>},
+      {"get_pins", sdc::executeTclCommand<sdc::TclGetPins>},
+      {"all_inputs", sdc::executeTclCommand<sdc::TclAllInputs>},
+      {"all_outputs", sdc::executeTclCommand<sdc::TclAllOutputs>},
       {"set_propagated_clock", sdc::executeTclCommand<sdc::TclSetPropagatedClock>},
   });
   STADM.readConstraint();
@@ -678,6 +688,11 @@ void STAInterface::wrapTimingCell(idb::LibCell* lib_cell)
   for (std::unique_ptr<idb::LibPort>& lib_port : lib_cell->get_cell_ports()) {
     wrapTimingCellPort(timing_cell, lib_port.get());
   }
+  for (std::unique_ptr<idb::LibPortBus>& lib_bus : lib_cell->get_cell_buses()) {
+    for (std::unique_ptr<idb::LibPort>& lib_port : lib_bus->get_ports()) {
+      wrapTimingCellPort(timing_cell, lib_port.get());
+    }
+  }
 
   wrapTimingCellSequential(timing_cell, lib_cell);
   wrapTimingCellPower(timing_cell, lib_cell);
@@ -698,6 +713,9 @@ void STAInterface::wrapTimingCellPort(TimingCell& timing_cell, idb::LibPort* lib
   timing_cell_port.set_port_name(lib_port->get_port_name());
   timing_cell_port.set_capacitance(lib_port->get_port_cap());
   timing_cell_port.set_drive_resistance(lib_port->driveResistance());
+  idb::LibLibrary* library = lib_port->get_ower_cell()->get_owner_lib();
+  timing_cell_port.set_fanout_load(lib_port->get_fanout_load().value_or(library->get_default_fanout_load().value_or(0.0)));
+  timing_cell_port.set_max_fanout(lib_port->get_max_fanout() ? lib_port->get_max_fanout() : library->get_default_max_fanout());
   for (idb::AnalysisMode analysis_mode : {idb::AnalysisMode::kMax, idb::AnalysisMode::kMin}) {
     for (idb::TransType trans_type : {idb::TransType::kRise, idb::TransType::kFall}) {
       std::optional<double> port_cap = lib_port->get_port_cap(analysis_mode, trans_type);
@@ -749,6 +767,14 @@ void STAInterface::wrapTimingCellPower(TimingCell& timing_cell, idb::LibCell* li
     std::string port_name = lib_port->get_port_name();
     for (std::unique_ptr<idb::LibInternalPowerInfo>& internal_power_info : lib_port->get_internal_powers()) {
       timing_cell.get_power_arc_list().push_back(wrapTimingPortPowerArc(internal_power_info.get(), port_name, lib_library));
+    }
+  }
+  for (std::unique_ptr<idb::LibPortBus>& lib_bus : lib_cell->get_cell_buses()) {
+    for (std::unique_ptr<idb::LibPort>& lib_port : lib_bus->get_ports()) {
+      std::string port_name = lib_port->get_port_name();
+      for (std::unique_ptr<idb::LibInternalPowerInfo>& internal_power_info : lib_port->get_internal_powers()) {
+        timing_cell.get_power_arc_list().push_back(wrapTimingPortPowerArc(internal_power_info.get(), port_name, lib_library));
+      }
     }
   }
 }
