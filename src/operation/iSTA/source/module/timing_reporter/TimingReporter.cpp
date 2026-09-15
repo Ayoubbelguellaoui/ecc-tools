@@ -1436,6 +1436,8 @@ void TimingReporter::outputRequiredClockInfo(std::ofstream* report_file, TimingP
     double required_before_check = timing_path.get_required_time();
     if (std::fabs(timing_path.get_check_time()) > STA_ERROR) {
       required_before_check -= delay_type == DelayType::kMax ? -timing_path.get_check_time() : timing_path.get_check_time();
+    } else if (isPort(timing_path.get_end_point())) {
+      required_before_check += getOutputDelay(timing_path, delay_type);
     }
     outputTimingLine(report_file, "clock uncertainty", signed_uncertainty, required_before_check, true, "", label_width);
   }
@@ -1452,7 +1454,7 @@ void TimingReporter::outputRequiredClockInfo(std::ofstream* report_file, TimingP
                             && (port_constraint_map[timing_path.get_end_point()].get_has_output_delay_max()
                                 || port_constraint_map[timing_path.get_end_point()].get_has_output_delay_min());
     if (has_output_delay) {
-      outputTimingLine(report_file, "output external delay", output_delay, timing_path.get_required_time(), true, "", label_width);
+      outputTimingLine(report_file, "output external delay", -output_delay, timing_path.get_required_time(), true, "", label_width);
     }
   }
   outputTimingSummaryLine(report_file, "data required time", timing_path.get_required_time(), label_width);
