@@ -895,6 +895,23 @@ LibPort& LibPort::operator=(LibPort&& rhs) noexcept
   return *this;
 }
 
+void LibPort::inheritBusAttributes(const LibPort& bus)
+{
+  _port_type = bus._port_type;
+  _is_clock_pin = bus._is_clock_pin;
+  _clock_gate_clock_pin = bus._clock_gate_clock_pin;
+  _clock_gate_enable_pin = bus._clock_gate_enable_pin;
+  _is_clock = bus._is_clock;
+  _func_expr = bus._func_expr;
+  _func_expr_str = bus._func_expr_str;
+  _port_cap = bus._port_cap;
+  _port_caps = bus._port_caps;
+  _cap_limits = bus._cap_limits;
+  _slew_limits = bus._slew_limits;
+  _fanout_load = bus._fanout_load;
+  _max_fanout = bus._max_fanout;
+}
+
 /**
  * @brief Set cap of max/min, rise/fall.
  *
@@ -1065,6 +1082,17 @@ bool LibPort::isSeqDataIn()
 
 LibPortBus::LibPortBus(const char* port_bus_name) : LibPort(port_bus_name)
 {
+}
+
+LibPort* LibPortBus::operator[](int index)
+{
+  std::string port_name = std::string(get_port_name()) + "[" + std::to_string(index) + "]";
+  for (std::unique_ptr<LibPort>& port : _ports) {
+    if (port_name == port->get_port_name()) {
+      return port.get();
+    }
+  }
+  return nullptr;
 }
 
 LibLeakagePower::LibLeakagePower() : _owner_cell(nullptr)

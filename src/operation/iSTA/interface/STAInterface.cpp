@@ -688,6 +688,11 @@ void STAInterface::wrapTimingCell(idb::LibCell* lib_cell)
   for (std::unique_ptr<idb::LibPort>& lib_port : lib_cell->get_cell_ports()) {
     wrapTimingCellPort(timing_cell, lib_port.get());
   }
+  for (std::unique_ptr<idb::LibPortBus>& lib_bus : lib_cell->get_cell_buses()) {
+    for (std::unique_ptr<idb::LibPort>& lib_port : lib_bus->get_ports()) {
+      wrapTimingCellPort(timing_cell, lib_port.get());
+    }
+  }
 
   wrapTimingCellSequential(timing_cell, lib_cell);
   wrapTimingCellPower(timing_cell, lib_cell);
@@ -762,6 +767,14 @@ void STAInterface::wrapTimingCellPower(TimingCell& timing_cell, idb::LibCell* li
     std::string port_name = lib_port->get_port_name();
     for (std::unique_ptr<idb::LibInternalPowerInfo>& internal_power_info : lib_port->get_internal_powers()) {
       timing_cell.get_power_arc_list().push_back(wrapTimingPortPowerArc(internal_power_info.get(), port_name, lib_library));
+    }
+  }
+  for (std::unique_ptr<idb::LibPortBus>& lib_bus : lib_cell->get_cell_buses()) {
+    for (std::unique_ptr<idb::LibPort>& lib_port : lib_bus->get_ports()) {
+      std::string port_name = lib_port->get_port_name();
+      for (std::unique_ptr<idb::LibInternalPowerInfo>& internal_power_info : lib_port->get_internal_powers()) {
+        timing_cell.get_power_arc_list().push_back(wrapTimingPortPowerArc(internal_power_info.get(), port_name, lib_library));
+      }
     }
   }
 }

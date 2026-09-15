@@ -26,6 +26,10 @@ namespace ista {
 
 namespace {
 
+constexpr int kTimingFanoutWidth = 8;
+constexpr int kTimingValueWidth = 16;
+constexpr int kTimingTableExtraWidth = 2 + kTimingFanoutWidth + 2 * kTimingValueWidth + 2;
+
 std::string escapeJsonString(const std::string& value)
 {
   static constexpr char kHexDigits[] = "0123456789abcdef";
@@ -221,6 +225,7 @@ void TimingReporter::outputReportHeader(std::ofstream* report_file, DelayType de
   (*report_file) << "Nworst : " << STADM.getConfig().endpoint_path_report_number << "\n";
   (*report_file) << "MaxPaths : " << STADM.getConfig().path_report_number << "\n";
   (*report_file) << "SortBy : slack\n";
+  (*report_file) << "Fanout : number of unique load pins driven by the point (blank for non-drivers)\n";
   (*report_file) << "****************************************\n\n";
 }
 
@@ -1118,7 +1123,7 @@ std::size_t TimingReporter::outputTimingPointList(std::ofstream* report_file, Ti
 {
   std::size_t label_width = getTimingLineLabelWidth(timing_path, delay_type);
   outputTimingPointHeader(report_file, label_width);
-  (*report_file) << "  " << std::string(label_width + 28, '-') << "\n";
+  (*report_file) << "  " << std::string(label_width + kTimingTableExtraWidth, '-') << "\n";
   outputLaunchClockInfo(report_file, timing_path, delay_type, label_width);
   bool is_first_point = true;
   for (TimingPathPoint& path_point : timing_path.get_point_list()) {
@@ -1197,7 +1202,8 @@ void TimingReporter::updateTimingLineLabelWidth(std::size_t& label_width, std::s
 
 void TimingReporter::outputTimingPointHeader(std::ofstream* report_file, std::size_t label_width)
 {
-  (*report_file) << "  " << std::left << std::setw(label_width) << "Point" << std::right << std::setw(10) << "Incr" << std::setw(11) << "Path"
+  (*report_file) << "  " << std::left << std::setw(label_width + 2) << "Point" << std::right << std::setw(kTimingFanoutWidth) << "Fanout"
+                 << std::setw(kTimingValueWidth) << "Incr" << std::setw(kTimingValueWidth) << "Path"
                  << "\n";
 }
 
@@ -1240,14 +1246,11 @@ std::string TimingReporter::getLaunchClockEdgeText(TimingPath& timing_path, Dela
 }
 
 void TimingReporter::outputTimingLine(std::ofstream* report_file, std::string_view label, double incr, double path, bool has_incr, std::string transition,
-                                      std::size_t label_width)
+                                      std::size_t label_width, std::optional<std::size_t> fanout)
 {
-  if (has_incr) {
-    (*report_file) << "  " << std::left << std::setw(label_width + 2) << label << getNumberString(incr) << "\n";
-    (*report_file) << "  " << std::setw(label_width + 13) << "" << getNumberString(path);
-  } else {
-    (*report_file) << "  " << std::left << std::setw(label_width + 13) << label << getNumberString(path);
-  }
+  (*report_file) << "  " << std::left << std::setw(label_width + 2) << label << std::right << std::setw(kTimingFanoutWidth)
+                 << (fanout.has_value() ? std::to_string(*fanout) : "") << std::setw(kTimingValueWidth) << (has_incr ? getNumberString(incr) : "")
+                 << std::setw(kTimingValueWidth) << getNumberString(path);
   if (!transition.empty()) {
     (*report_file) << " " << transition;
   }
@@ -1256,7 +1259,7 @@ void TimingReporter::outputTimingLine(std::ofstream* report_file, std::string_vi
 
 void TimingReporter::outputTimingSummaryLine(std::ofstream* report_file, std::string label, double value, std::size_t label_width)
 {
-  (*report_file) << "  " << std::left << std::setw(label_width + 13) << label << getNumberString(value) << "\n";
+  outputTimingLine(report_file, label, 0.0, value, false, "", label_width);
 }
 
 std::string TimingReporter::getClockName(TimingPath& timing_path)
@@ -1344,7 +1347,28 @@ void TimingReporter::outputTimingPoint(std::ofstream* report_file, TimingPath& t
     arc_delay = path_point.get_arrival() - timing_path.get_launch_time();
   }
   outputTimingLine(report_file, getPointLabel(path_point), arc_delay, path_point.get_arrival(), true, GetTransTypeInitial()(path_point.get_trans_type()),
-                   label_width);
+                   label_width, getPinFanout(path_point.get_pin_name()));
+}
+
+std::optional<std::size_t> TimingReporter::getPinFanout(const std::string& pin_name)
+{
+  Database& database = STADM.getDatabase();
+  auto pin_it = database.get_pin_map().find(pin_name);
+  if (pin_it == database.get_pin_map().end()) {
+    return std::nullopt;
+  }
+  auto net_it = database.get_net_map().find(pin_it->second.get_net_name());
+  if (net_it == database.get_net_map().end()) {
+    return std::nullopt;
+  }
+  Net& net = net_it->second;
+  const std::vector<std::string>& drivers = net.get_driver_pin_list();
+  if (net.get_driver_pin() != pin_name && std::find(drivers.begin(), drivers.end(), pin_name) == drivers.end()) {
+    return std::nullopt;
+  }
+  std::set<std::string> loads(net.get_load_pin_list().begin(), net.get_load_pin_list().end());
+  loads.erase(pin_name);
+  return loads.size();
 }
 
 std::string TimingReporter::getNumberString(double value)
@@ -1478,10 +1502,10 @@ std::string TimingReporter::getPinLabel(std::string& pin_name)
 
 void TimingReporter::outputTimingPathSummary(std::ofstream* report_file, TimingPath& timing_path, std::size_t label_width)
 {
-  (*report_file) << "  " << std::string(label_width + 28, '-') << "\n";
+  (*report_file) << "  " << std::string(label_width + kTimingTableExtraWidth, '-') << "\n";
   outputTimingSummaryLine(report_file, "data required time", timing_path.get_required_time(), label_width);
   outputTimingSummaryLine(report_file, "data arrival time", -timing_path.get_path_delay(), label_width);
-  (*report_file) << "  " << std::string(label_width + 28, '-') << "\n";
+  (*report_file) << "  " << std::string(label_width + kTimingTableExtraWidth, '-') << "\n";
   outputTimingSummaryLine(report_file, STAUTIL.getString("slack (", getSlackStatus(timing_path), ")"), timing_path.get_slack(), label_width);
   (*report_file) << "\n\n";
 }
