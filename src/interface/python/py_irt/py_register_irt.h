@@ -28,6 +28,5 @@ void register_irt(py::module& m)
   m.def("run_ert", runERT, py::arg("config") = "", py::arg("config_dict") = std::map<std::string, std::string>{});
   m.def("run_rt", runRT);
   m.def("destroy_rt", destroyRT);
-  m.def("rt_clean_def", cleanDef);
 }
 }  // namespace python_interface
