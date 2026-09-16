@@ -62,6 +62,7 @@ class DelayCalculator
   static constexpr double kDriverParameterTolerance = 0.01;
   static constexpr double kThresholdTimeTolerance = 0.01;
   static constexpr double kTinyNumber = 1E-20;
+  static constexpr double kMinSlewResistanceThreshold = 0.45;
   static constexpr double kGateResistanceCapacitanceStep = 1E-3;
   static constexpr double kCapacitiveDriverResistance = 1E-5;
   TimingArc* _timing_arc = nullptr;
@@ -251,6 +252,7 @@ class DelayCalculator
                                                                      TransType output_trans_type, double input_slew);
   ParasiticArnoldiTimingResult calcParasiticArnoldiTimingResult(std::string& output_pin, TimingArc& timing_arc, AnalysisType analysis_type,
                                                                 TransType output_trans_type, double input_slew, double output_load);
+  bool isParasiticLoadSlewCompatible(TimingArc& timing_arc, std::string& load_pin, TransType trans_type);
   void adjustParasiticLoadThreshold(TimingArc& timing_arc, std::string& load_pin, TransType trans_type, double& wire_delay, double& load_slew);
   TimingCell* getThresholdTimingCell(std::string& pin_name);
   double getTimingCellSlewLowerThreshold(TimingCell& timing_cell, TransType trans_type);

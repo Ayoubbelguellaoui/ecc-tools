@@ -34,6 +34,7 @@ class Config
   int32_t output_timing_reports = 1;
   int32_t output_timing_features = 1;
   int32_t timing_path_limit = 20;
+  int32_t min_slew_degradation = 1;
   std::string timing_corner;
   bool is_path_report_number_specified = false;
   bool has_timing_report_slack_lesser_than = false;

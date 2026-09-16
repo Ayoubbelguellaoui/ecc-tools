@@ -2208,6 +2208,8 @@ ParasiticArnoldiTimingResult DelayCalculator::calcParasiticArnoldiTimingResult(s
   timing_result.set_effective_capacitance(effective_capacitance);
   timing_result.set_gate_delay(delay_list.front());
   timing_result.set_driver_slew(slew_list.front());
+  bool suppress_min_slew = STADM.getConfig().min_slew_degradation == 0 && analysis_type == AnalysisType::kMin
+                           && arnoldi_model.get_pi_resistance() > kMinSlewResistanceThreshold * drive_resistance;
   for (std::size_t term_idx = 0; term_idx < arnoldi_model.get_term_node_list().size(); term_idx++) {
     std::string& term_node_name = arnoldi_model.get_term_node_list()[term_idx];
     double wire_delay = delay_list[term_idx] - delay_list.front();
@@ -2215,6 +2217,13 @@ ParasiticArnoldiTimingResult DelayCalculator::calcParasiticArnoldiTimingResult(s
     std::string pin_name = getPinNameByParasiticNodeName(term_node_name);
     if (term_idx > 0) {
       adjustParasiticLoadThreshold(timing_arc, pin_name, output_trans_type, wire_delay, load_slew);
+      if (suppress_min_slew && isParasiticLoadSlewCompatible(timing_arc, pin_name, output_trans_type)) {
+        // Keep the delay threshold correction from the physical load waveform.
+        // Convert the replacement slew to the receiver library independently.
+        load_slew = slew_list.front();
+        double unused_wire_delay = 0.0;
+        adjustParasiticLoadThreshold(timing_arc, pin_name, output_trans_type, unused_wire_delay, load_slew);
+      }
     }
     timing_result.get_wire_delay_map()[term_node_name] = wire_delay;
     timing_result.get_load_slew_map()[term_node_name] = load_slew;
@@ -2223,6 +2232,26 @@ ParasiticArnoldiTimingResult DelayCalculator::calcParasiticArnoldiTimingResult(s
   }
   cacheParasiticArnoldiDriverResult(output_pin, analysis_type, output_trans_type, timing_result.get_driver_slew(), timing_result);
   return timing_result;
+}
+
+bool DelayCalculator::isParasiticLoadSlewCompatible(TimingArc& timing_arc, std::string& load_pin, TransType trans_type)
+{
+  // The optional resistance-ratio approximation is limited to matching slew
+  // conventions. Preserve the receiver waveform when a library conversion is
+  // needed; converting the driver slew alone can discard significant RC slew.
+  TimingCell* load_timing_cell = getThresholdTimingCell(load_pin);
+  if (load_timing_cell == nullptr) {
+    return false;
+  }
+  double driver_lower_threshold
+      = trans_type == TransType::kFall ? timing_arc.get_slew_lower_threshold_pct_fall() : timing_arc.get_slew_lower_threshold_pct_rise();
+  double driver_upper_threshold
+      = trans_type == TransType::kFall ? timing_arc.get_slew_upper_threshold_pct_fall() : timing_arc.get_slew_upper_threshold_pct_rise();
+  double load_lower_threshold = getTimingCellSlewLowerThreshold(*load_timing_cell, trans_type);
+  double load_upper_threshold = getTimingCellSlewUpperThreshold(*load_timing_cell, trans_type);
+  return std::abs(getNormalizedThreshold(driver_lower_threshold) - getNormalizedThreshold(load_lower_threshold)) < STA_ERROR
+         && std::abs(getNormalizedThreshold(driver_upper_threshold) - getNormalizedThreshold(load_upper_threshold)) < STA_ERROR
+         && std::abs(timing_arc.get_slew_derate() - load_timing_cell->get_slew_derate_from_library()) < STA_ERROR;
 }
 
 void DelayCalculator::adjustParasiticLoadThreshold(TimingArc& timing_arc, std::string& load_pin, TransType trans_type, double& wire_delay, double& load_slew)
@@ -2521,6 +2550,14 @@ void DelayCalculator::updateParasiticArnoldiModel(ParasiticArnoldiModel& arnoldi
   }
 
   bool has_resistance_loop = network_resistance_num + 1 > node_num;
+  // The moment recurrence is valid for trees; loops retain waveform slew.
+  if (!has_resistance_loop && STADM.getConfig().min_slew_degradation == 0) {
+    ParasiticDmpModel pi_model;
+    buildParasiticDmpPiModel(pi_model, parent_idx_list, resistance_list, capacitance_list);
+    if (pi_model.get_is_valid()) {
+      arnoldi_model.set_pi_resistance(pi_model.get_pi_resistance());
+    }
+  }
   Eigen::SparseMatrix<double> conductance_matrix;
   Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower | Eigen::Upper, Eigen::IncompleteCholesky<double>> conductance_solver;
   if (has_resistance_loop) {
