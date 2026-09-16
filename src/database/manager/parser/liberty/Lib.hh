@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include <array>
 #include <map>
 #include <memory>
 #include <optional>
@@ -33,8 +34,6 @@
 #include <utility>
 #include <vector>
 
-#include "absl/container/btree_map.h"
-#include "absl/container/inlined_vector.h"
 #include "LibParserCpp.hh"
 #include "Config.hh"
 #include "Type.hh"
@@ -169,7 +168,7 @@ class LibTable : public LibObject
 
   LibAxis& getAxis(unsigned int index);
 
-  absl::InlinedVector<std::unique_ptr<LibAxis>, 64>& get_axes();
+  std::vector<std::unique_ptr<LibAxis>>& get_axes();
   auto getAxesSize() { return _axes.size(); }
 
   void addTableValue(std::unique_ptr<LibAttrValue> table_value) { _table_values.emplace_back(std::move(table_value)); }
@@ -191,7 +190,7 @@ class LibTable : public LibObject
   double driveResistance();
 
  private:
-  absl::InlinedVector<std::unique_ptr<LibAxis>, 64> _axes;  //!< May be zero, one, two, three axes.
+  std::vector<std::unique_ptr<LibAxis>> _axes;  //!< May be zero, one, two, three axes.
   std::vector<std::unique_ptr<LibAttrValue>> _table_values;  //!< The axis values.
   TableType _table_type;                                     //!< The table type.
 
@@ -641,7 +640,7 @@ class LibPort : public LibObject
   std::optional<double> _fanout_load;
   std::optional<double> _max_fanout;
 
-  absl::InlinedVector<std::unique_ptr<LibInternalPowerInfo>, 64> _internal_powers;  //!< The internal power information.
+  std::vector<std::unique_ptr<LibInternalPowerInfo>> _internal_powers;  //!< The internal power information.
 
   FORBIDDEN_COPY(LibPort);
 };
@@ -725,7 +724,7 @@ class LibPortBus : public LibPort
   LibPort* operator[](int index);
 
  private:
-  absl::InlinedVector<std::unique_ptr<LibPort>, 64> _ports;  //!< The bus ports.
+  std::vector<std::unique_ptr<LibPort>> _ports;  //!< The bus ports.
   LibType* _bus_type = nullptr;
 
   FORBIDDEN_COPY(LibPortBus);
@@ -931,7 +930,7 @@ class LibArc : public LibObject
 
   std::unique_ptr<LibTableModel> _table_model;  //!< The arc timing model.
 
-  static absl::btree_map<std::string, TimingType> _str_to_type;
+  static std::map<std::string, TimingType> _str_to_type;
 
   unsigned _is_disable_arc = 0;  //!< Forbidden arc.
 
@@ -966,7 +965,7 @@ class LibArcSet
   unsigned isTwoTypeSenseArcSet();
 
  private:
-  absl::InlinedVector<std::unique_ptr<LibArc>, 64> _arcs;
+  std::vector<std::unique_ptr<LibArc>> _arcs;
 
   FORBIDDEN_COPY(LibArcSet);
 };
@@ -1043,7 +1042,7 @@ class LibPowerArcSet
   auto& get_power_arcs() { return _power_arcs; }
 
  private:
-  absl::InlinedVector<std::unique_ptr<LibPowerArc>, 64> _power_arcs;
+  std::vector<std::unique_ptr<LibPowerArc>> _power_arcs;
 
   FORBIDDEN_COPY(LibPowerArcSet);
 };
@@ -1359,7 +1358,7 @@ class LibLutTableTemplate : public LibObject
   std::optional<Variable> _template_variable3;
   std::optional<Variable> _template_variable4;
 
-  absl::InlinedVector<std::unique_ptr<LibAxis>, 64> _axes;  //!< May be zero, one, two, three axes.
+  std::vector<std::unique_ptr<LibAxis>> _axes;  //!< May be zero, one, two, three axes.
 
   FORBIDDEN_COPY(LibLutTableTemplate);
 };
@@ -1669,15 +1668,15 @@ class LibLibrary : public LibObject
   std::vector<std::unique_ptr<LibCell>> _cells;  //!< The liberty cell, perserve the cell read order.
   std::map<std::string, LibCell*> _str2cell;
 
-  absl::InlinedVector<std::unique_ptr<LibLutTableTemplate>, 64> _lut_templates;  //!< The timing table lut template, preserve the
+  std::vector<std::unique_ptr<LibLutTableTemplate>> _lut_templates;  //!< The timing table lut template, preserve the
                                                                                    //!< template order.
 
   std::map<std::string, LibLutTableTemplate*> _str2template;
 
-  absl::InlinedVector<std::unique_ptr<LibWireLoad>, 64> _wire_loads;  //!< The wire load models.
+  std::vector<std::unique_ptr<LibWireLoad>> _wire_loads;  //!< The wire load models.
   std::map<std::string, LibWireLoad*> _str2wireLoad;
 
-  absl::InlinedVector<std::unique_ptr<LibType>, 64> _types;  //!< The lib type
+  std::vector<std::unique_ptr<LibType>> _types;  //!< The lib type
 
   std::map<std::string, LibType*> _str2type;
 
