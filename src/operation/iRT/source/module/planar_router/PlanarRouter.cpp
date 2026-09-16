@@ -811,7 +811,7 @@ std::vector<PRCandidate> PlanarRouter::getPRCandidateListByTopo(int32_t expand_s
   return pr_candidate_list;
 }
 
-bool PlanarRouter::shouldUseCongestionFlute(double overflow_unit, const PRNet& pr_net, size_t unique_pin_num)
+bool PlanarRouter::shouldRefineTopology(double overflow_unit, const PRNet& pr_net, size_t unique_pin_num)
 {
   if (unique_pin_num < 3) {
     return false;
@@ -846,9 +846,9 @@ std::vector<Segment<PlanarCoord>> PlanarRouter::getPlanarTopoList(double overflo
   tb_task.set_planar_coord_list(planar_coord_list);
   GridMap<PlanarRect>& gcell_map = RTDM.getDatabase().get_gcell_map();
   tb_task.set_planar_search_region(PlanarRect(0, 0, gcell_map.get_x_size() - 1, gcell_map.get_y_size() - 1));
-  bool congestion_driven = pr_topo_mode == PRTopoMode::kCongestion && shouldUseCongestionFlute(overflow_unit, pr_net, planar_coord_list.size());
-  tb_task.set_topo_mode(congestion_driven ? TBTopoMode::kCongestion : TBTopoMode::kGeometry);
-  if (!congestion_driven) {
+  bool refine_topology = pr_topo_mode == PRTopoMode::kCongestion && shouldRefineTopology(overflow_unit, pr_net, planar_coord_list.size());
+  tb_task.set_topo_mode(refine_topology ? TBTopoMode::kCongestion : TBTopoMode::kGeometry);
+  if (!refine_topology) {
     return RTTB.getPlanarTopoList(tb_task);
   }
 
