@@ -22,7 +22,6 @@
  * @date 2023-10-13
  *
  */
-#include "absl/container/btree_set.h"
 #include "CppLibertyDriver.hh"
 #include "Lib.hh"
 #include "LibParserCpp.hh"
@@ -34,6 +33,7 @@
 #include <cstdlib>
 #include <memory>
 #include <regex>
+#include <set>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -1582,11 +1582,10 @@ unsigned LibertyReader::visitGroup(LibertyGroupStmt* group) {
   unsigned is_ok = 1;
   const char* group_name = group->group_name;
 
-  static const absl::btree_set<std::string> table_names = {
+  static const std::set<std::string> table_names = {
       "cell_rise",       "cell_fall",       "rise_transition",
       "fall_transition", "rise_constraint", "fall_constraint"};
-  static const absl::btree_set<std::string> power_table_names = {"rise_power",
-                                                                "fall_power"};
+  static const std::set<std::string> power_table_names = {"rise_power", "fall_power"};
 
   if (isEqual(group_name, "library")) {
     is_ok = visitLibrary(group);
@@ -2040,11 +2039,10 @@ unsigned LibertyReader::visitGroup(liberty_ast::LibGroup* group) {
   unsigned is_ok = 1;
   const char* group_name = group->getGroupType();
 
-  static const absl::btree_set<std::string> table_names = {
+  static const std::set<std::string> table_names = {
       "cell_rise",       "cell_fall",       "rise_transition",
       "fall_transition", "rise_constraint", "fall_constraint"};
-  static const absl::btree_set<std::string> power_table_names = {"rise_power",
-                                                                "fall_power"};
+  static const std::set<std::string> power_table_names = {"rise_power", "fall_power"};
 
   if (isEqual(group_name, "library")) {
     is_ok = visitLibrary(group);

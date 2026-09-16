@@ -238,7 +238,7 @@ LibTable& LibTable::operator=(LibTable&& rhs) noexcept
  * @Brief : get axes or template axes.
  * @return auto&
  */
-absl::InlinedVector<std::unique_ptr<LibAxis>, 64>& LibTable::get_axes()
+std::vector<std::unique_ptr<LibAxis>>& LibTable::get_axes()
 {
   if (_axes.empty()) {
     LibLutTableTemplate* table_template = get_table_template();
@@ -536,7 +536,7 @@ LibCurrentData::LibCurrentData(LibVectorTable* low_low, LibVectorTable* low_high
  */
 std::tuple<double, int> LibCurrentData::getSimulationTotalTimeAndNumPoints()
 {
-  absl::btree_map<double, int> total_simulation_times;
+  std::map<double, int> total_simulation_times;
 
   for (auto* table : {_low_low, _low_high, _high_low, _high_high}) {
     auto [total_time, num_point] = table->getSimulationTotalTimeAndNumPoints();
@@ -1122,13 +1122,13 @@ LibLeakagePower& LibLeakagePower::operator=(LibLeakagePower&& rhs) noexcept
   return *this;
 }
 
-absl::btree_map<std::string, LibArc::TimingType> LibArc::_str_to_type = {{"setup_rising", TimingType::kSetupRising},
-                                                                          {"hold_rising", TimingType::kHoldRising},
-                                                                          {"recovery_rising", TimingType::kRecoveryRising},
-                                                                          {"removal_rising", TimingType::kRemovalRising},
-                                                                          {"rising_edge", TimingType::kRisingEdge},
-                                                                          {"preset", TimingType::kPreset},
-                                                                          {"clear", TimingType::kClear},
+std::map<std::string, LibArc::TimingType> LibArc::_str_to_type = {{"setup_rising", TimingType::kSetupRising},
+                                                                   {"hold_rising", TimingType::kHoldRising},
+                                                                   {"recovery_rising", TimingType::kRecoveryRising},
+                                                                   {"removal_rising", TimingType::kRemovalRising},
+                                                                   {"rising_edge", TimingType::kRisingEdge},
+                                                                   {"preset", TimingType::kPreset},
+                                                                   {"clear", TimingType::kClear},
                                                                   {"three_state_enable", TimingType::kThreeStateEnable},
                                                                   {"three_state_enable_rise", TimingType::kThreeStateEnableRise},
                                                                   {"three_state_enable_fall", TimingType::kThreeStateEnableFall},
