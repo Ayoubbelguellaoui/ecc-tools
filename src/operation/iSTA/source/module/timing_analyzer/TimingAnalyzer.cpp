@@ -405,11 +405,15 @@ double TimingAnalyzer::getEndPointRequired(std::string& start_point, std::string
   Pin& pin = database.get_pin_map()[end_point];
   if (pin.get_is_port()) {
     std::map<std::string, TimingPortConstraint>& port_constraint_map = database.get_timing_constraint().get_port_constraint_map();
+    double uncertainty = getClockUncertainty(end_point, analysis_type);
+    double signed_uncertainty = analysis_type == AnalysisType::kMin ? uncertainty : -uncertainty;
     if (analysis_type == AnalysisType::kMin && port_constraint_map.count(end_point) > 0 && port_constraint_map[end_point].get_has_output_delay_min()) {
-      return getEndPointCaptureTime(start_point, end_point, analysis_type) - port_constraint_map[end_point].get_output_delay_min();
+      return roundTime(getEndPointCaptureTime(start_point, end_point, analysis_type) - port_constraint_map[end_point].get_output_delay_min()
+                       + signed_uncertainty);
     }
     if (port_constraint_map.count(end_point) > 0 && port_constraint_map[end_point].get_has_output_delay_max()) {
-      return getEndPointCaptureTime(start_point, end_point, analysis_type) - port_constraint_map[end_point].get_output_delay_max();
+      return roundTime(getEndPointCaptureTime(start_point, end_point, analysis_type) - port_constraint_map[end_point].get_output_delay_max()
+                       + signed_uncertainty);
     }
     return default_required_time;
   }
