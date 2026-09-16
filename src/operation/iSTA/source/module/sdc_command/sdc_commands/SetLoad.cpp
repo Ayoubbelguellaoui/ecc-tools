@@ -22,6 +22,7 @@ namespace ista::sdc {
 
 TclSetLoad::TclSetLoad(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
 {
+  addOption(new ecc::TclSwitchOption("-pin_load"));
   addOption(new ecc::TclDoubleOption("load", 1));
   addOption(new ecc::TclStringListOption("objects", 1));
 }

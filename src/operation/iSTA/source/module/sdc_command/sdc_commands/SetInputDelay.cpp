@@ -25,6 +25,7 @@ TclSetInputDelay::TclSetInputDelay(const char* cmd_name, ClientData client_data)
   addOption(new ecc::TclStringOption("-clock", 0));
   addOption(new ecc::TclSwitchOption("-min"));
   addOption(new ecc::TclSwitchOption("-max"));
+  addOption(new ecc::TclSwitchOption("-add_delay"));
   addOption(new ecc::TclDoubleOption("delay", 1));
   addOption(new ecc::TclStringListOption("objects", 1));
 }
