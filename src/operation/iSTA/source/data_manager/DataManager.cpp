@@ -351,6 +351,8 @@ void DataManager::printConfig()
   STALOG.info(Loc::current(), STAUTIL.getSpaceByTabNum(2), _config.output_timing_reports);
   STALOG.info(Loc::current(), STAUTIL.getSpaceByTabNum(1), "output_timing_features");
   STALOG.info(Loc::current(), STAUTIL.getSpaceByTabNum(2), _config.output_timing_features);
+  STALOG.info(Loc::current(), STAUTIL.getSpaceByTabNum(1), "min_slew_degradation");
+  STALOG.info(Loc::current(), STAUTIL.getSpaceByTabNum(2), _config.min_slew_degradation);
   STALOG.info(Loc::current(), STAUTIL.getSpaceByTabNum(1), "timing_path_limit");
   STALOG.info(Loc::current(), STAUTIL.getSpaceByTabNum(2), _config.timing_path_limit);
   // **********        STA        ********** //

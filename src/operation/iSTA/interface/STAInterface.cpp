@@ -16,6 +16,8 @@
 // ***************************************************************************************
 #include "STAInterface.hpp"
 
+#include <stdexcept>
+
 #ifdef __GLIBC__
 #include <malloc.h>
 #endif
@@ -70,6 +72,12 @@ void STAInterface::destroyInst()
 
 void STAInterface::initSTA(std::map<std::string, std::any> config_map)
 {
+  if (config_map.contains("-min_slew_degradation")) {
+    int32_t value = std::any_cast<int32_t>(config_map.at("-min_slew_degradation"));
+    if (value != 0 && value != 1) {
+      throw std::invalid_argument("-min_slew_degradation must be 0 or 1");
+    }
+  }
   Logger::initInst();
   // clang-format off
   STALOG.info(Loc::current(), ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
@@ -257,6 +265,7 @@ void STAInterface::wrapConfig(std::map<std::string, std::any>& config_map)
   STADM.getConfig().output_timing_reports = STAUTIL.getConfigValue<int32_t>(config_map, "-output_timing_reports", 1);
   STADM.getConfig().output_timing_features = STAUTIL.getConfigValue<int32_t>(config_map, "-output_timing_features", 1);
   STADM.getConfig().timing_path_limit = STAUTIL.getConfigValue<int32_t>(config_map, "-timing_path_limit", 20);
+  STADM.getConfig().min_slew_degradation = STAUTIL.getConfigValue<int32_t>(config_map, "-min_slew_degradation", 1);
   STADM.getConfig().timing_corner = STAUTIL.getConfigValue<std::string>(config_map, "-timing_corner", "");
   STADM.getConfig().is_path_report_number_specified = STAUTIL.exist(config_map, std::string("-max_paths"))
                                                       || STAUTIL.exist(config_map, std::string("-max_path"))
