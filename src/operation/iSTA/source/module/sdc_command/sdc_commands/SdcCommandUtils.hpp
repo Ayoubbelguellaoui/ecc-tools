@@ -24,6 +24,8 @@ enum class QueryObjectType
 {
   kPort,
   kPin,
+  kCell,
+  kNet,
   kClock,
   kAny
 };

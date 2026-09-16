@@ -45,7 +45,7 @@ std::vector<std::string> queryObjects(Database& database, const std::vector<std:
       names[name] = name;
     }
   }
-  if (type != QueryObjectType::kClock) {
+  if (type == QueryObjectType::kPort || type == QueryObjectType::kPin || type == QueryObjectType::kAny) {
     for (auto& [name, pin] : database.get_pin_map()) {
       if ((type == QueryObjectType::kPort && !pin.get_is_port()) || (type == QueryObjectType::kPin && pin.get_is_port())) {
         continue;
@@ -56,8 +56,13 @@ std::vector<std::string> queryObjects(Database& database, const std::vector<std:
       }
     }
   }
-  if (type == QueryObjectType::kAny) {
+  if (type == QueryObjectType::kCell || type == QueryObjectType::kAny) {
     for (const auto& [name, instance] : database.get_instance_map()) {
+      names[name] = name;
+    }
+  }
+  if (type == QueryObjectType::kNet || type == QueryObjectType::kAny) {
+    for (const auto& [name, net] : database.get_net_map()) {
       names[name] = name;
     }
   }
@@ -101,7 +106,7 @@ std::set<std::string> resolveExceptionObjects(Database& database, const std::vec
 {
   std::set<std::string> result;
   for (const std::string& object : objects) {
-    if (database.get_pin_map().contains(object) || database.get_instance_map().contains(object)
+    if (database.get_pin_map().contains(object) || database.get_instance_map().contains(object) || database.get_net_map().contains(object)
         || database.get_timing_constraint().get_clock_map().contains(object)) {
       result.insert(object);
       continue;

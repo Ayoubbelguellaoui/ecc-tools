@@ -34,6 +34,9 @@ class TimingPathState
   std::string& get_predecessor() { return _predecessor; }
   std::string& get_clock_name() { return _clock_name; }
   std::string& get_crpr_clock_pin() { return _crpr_clock_pin; }
+  const std::string& get_path_state_tag() const { return _path_state_tag; }
+  const std::string& get_predecessor_path_state_tag() const { return _predecessor_path_state_tag; }
+  const std::vector<int32_t>& get_false_path_state_list() const { return _false_path_state_list; }
   std::size_t get_predecessor_arc_idx() const { return _predecessor_arc_idx; }
   double get_predecessor_arc_delay() const { return _predecessor_arc_delay; }
   TransType get_trans_type() const { return _trans_type; }
@@ -47,6 +50,9 @@ class TimingPathState
   void set_predecessor(const std::string_view predecessor) { _predecessor = predecessor; }
   void set_clock_name(const std::string_view clock_name) { _clock_name = clock_name; }
   void set_crpr_clock_pin(const std::string_view crpr_clock_pin) { _crpr_clock_pin = crpr_clock_pin; }
+  void set_path_state_tag(const std::string_view path_state_tag) { _path_state_tag = path_state_tag; }
+  void set_predecessor_path_state_tag(const std::string_view path_state_tag) { _predecessor_path_state_tag = path_state_tag; }
+  void set_false_path_state_list(const std::vector<int32_t>& false_path_state_list) { _false_path_state_list = false_path_state_list; }
   void set_predecessor_arc_idx(const std::size_t predecessor_arc_idx) { _predecessor_arc_idx = predecessor_arc_idx; }
   void set_predecessor_arc_delay(const double predecessor_arc_delay) { _predecessor_arc_delay = predecessor_arc_delay; }
   void set_trans_type(const TransType& trans_type) { _trans_type = trans_type; }
@@ -62,6 +68,9 @@ class TimingPathState
   std::string _predecessor;
   std::string _clock_name;
   std::string _crpr_clock_pin;
+  std::string _path_state_tag;
+  std::string _predecessor_path_state_tag;
+  std::vector<int32_t> _false_path_state_list;
   std::size_t _predecessor_arc_idx = std::numeric_limits<std::size_t>::max();
   double _predecessor_arc_delay = 0.0;
   TransType _trans_type = TransType::kNone;
