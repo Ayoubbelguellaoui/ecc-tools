@@ -15,6 +15,7 @@
 // ***************************************************************************************
 #pragma once
 
+#include "DCTimingResult.hpp"
 #include "Database.hpp"
 #include "TPModel.hpp"
 
@@ -75,6 +76,7 @@ class TimingPropagator
   TimingClock* getStartPointClock(std::string& start_point);
   double getStartPointClockEdge(std::string& start_point, AnalysisType analysis_type, TransType trans_type);
   double getStartPointSlew(std::string& start_point, AnalysisType analysis_type, TransType trans_type);
+  std::optional<DCTimingResult> getDrivingCellTiming(std::string& start_point, AnalysisType analysis_type, TransType trans_type);
   double getStartPointLaunchTime(std::string& start_point, AnalysisType analysis_type);
   double getStartPointLaunchTime(std::string& start_point, AnalysisType analysis_type, TransType trans_type);
   std::string getStartPointCrprClockPin(std::string& start_point);

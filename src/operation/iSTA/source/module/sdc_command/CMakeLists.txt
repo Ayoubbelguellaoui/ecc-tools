@@ -18,6 +18,7 @@ add_library(ista_sdc_command
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetInputDelay.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetOutputDelay.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetInputTransition.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/SetDrivingCell.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetLoad.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetClockUncertainty.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetPropagatedClock.cpp

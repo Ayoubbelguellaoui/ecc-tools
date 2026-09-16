@@ -107,6 +107,7 @@ void STAInterface::initSTA(std::map<std::string, std::any> config_map)
       {"set_input_delay", sdc::executeTclCommand<sdc::TclSetInputDelay>},
       {"set_output_delay", sdc::executeTclCommand<sdc::TclSetOutputDelay>},
       {"set_input_transition", sdc::executeTclCommand<sdc::TclSetInputTransition>},
+      {"set_driving_cell", sdc::executeTclCommand<sdc::TclSetDrivingCell>},
       {"set_load", sdc::executeTclCommand<sdc::TclSetLoad>},
       {"set_clock_uncertainty", sdc::executeTclCommand<sdc::TclSetClockUncertainty>},
       {"get_clock", sdc::executeTclCommand<sdc::TclGetClocks>},

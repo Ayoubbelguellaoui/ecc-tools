@@ -132,6 +132,14 @@ class TclSetInputTransition : public SdcTclCmd
   unsigned exec() override;
 };
 
+class TclSetDrivingCell : public SdcTclCmd
+{
+ public:
+  TclSetDrivingCell(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
 class TclSetLoad : public SdcTclCmd
 {
  public:

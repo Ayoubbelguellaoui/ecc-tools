@@ -342,13 +342,14 @@ double TimingPropagator::getStartPointArrival(std::string& start_point, Analysis
   Pin& pin = database.get_pin_map()[start_point];
   if (pin.get_is_port()) {
     std::map<std::string, TimingPortConstraint>& port_constraint_map = database.get_timing_constraint().get_port_constraint_map();
+    double arrival = 0.0;
     if (analysis_type == AnalysisType::kMin && port_constraint_map.count(start_point) > 0 && port_constraint_map[start_point].get_has_input_delay_min()) {
-      return STAUTIL.getLaunchClockEdge(database, start_point, getClockName(start_point)) + port_constraint_map[start_point].get_input_delay_min();
+      arrival = STAUTIL.getLaunchClockEdge(database, start_point, getClockName(start_point)) + port_constraint_map[start_point].get_input_delay_min();
+    } else if (port_constraint_map.count(start_point) > 0 && port_constraint_map[start_point].get_has_input_delay_max()) {
+      arrival = STAUTIL.getLaunchClockEdge(database, start_point, getClockName(start_point)) + port_constraint_map[start_point].get_input_delay_max();
     }
-    if (port_constraint_map.count(start_point) > 0 && port_constraint_map[start_point].get_has_input_delay_max()) {
-      return STAUTIL.getLaunchClockEdge(database, start_point, getClockName(start_point)) + port_constraint_map[start_point].get_input_delay_max();
-    }
-    return 0.0;
+    std::optional<DCTimingResult> driving_cell_timing = getDrivingCellTiming(start_point, analysis_type, trans_type);
+    return driving_cell_timing ? arrival + driving_cell_timing->get_delay() : arrival;
   }
   if (database.get_instance_map().count(pin.get_instance_name()) == 0) {
     return 0.0;
@@ -417,8 +418,16 @@ double TimingPropagator::getStartPointSlew(std::string& start_point, AnalysisTyp
   Pin& pin = database.get_pin_map()[start_point];
   if (pin.get_is_port()) {
     std::map<std::string, TimingPortConstraint>& port_constraint_map = database.get_timing_constraint().get_port_constraint_map();
-    if (port_constraint_map.count(start_point) > 0 && port_constraint_map[start_point].get_has_input_transition()) {
-      return port_constraint_map[start_point].get_input_transition();
+    if (port_constraint_map.count(start_point) == 0) {
+      return 0.0;
+    }
+    TimingPortConstraint& port_constraint = port_constraint_map[start_point];
+    if (port_constraint.get_has_driving_cell(analysis_type, trans_type)) {
+      std::optional<DCTimingResult> driving_cell_timing = getDrivingCellTiming(start_point, analysis_type, trans_type);
+      return driving_cell_timing ? driving_cell_timing->get_slew() : 0.0;
+    }
+    if (port_constraint.get_has_input_transition(analysis_type, trans_type)) {
+      return port_constraint.get_input_transition(analysis_type, trans_type);
     }
     return 0.0;
   }
@@ -447,6 +456,38 @@ double TimingPropagator::getStartPointSlew(std::string& start_point, AnalysisTyp
     }
   }
   return 0.0;
+}
+
+std::optional<DCTimingResult> TimingPropagator::getDrivingCellTiming(std::string& start_point, AnalysisType analysis_type, TransType trans_type)
+{
+  Database& database = STADM.getDatabase();
+  std::map<std::string, TimingPortConstraint>& port_constraint_map = database.get_timing_constraint().get_port_constraint_map();
+  if (!port_constraint_map.contains(start_point)) {
+    return std::nullopt;
+  }
+  TimingDrivingCell* driving_cell = port_constraint_map.at(start_point).get_driving_cell(analysis_type, trans_type);
+  if (driving_cell == nullptr) {
+    return std::nullopt;
+  }
+  std::map<std::string, TimingCell>& timing_cell_map = database.get_timing_library().get_cell_map();
+  if (!timing_cell_map.contains(driving_cell->get_cell_name())) {
+    return std::nullopt;
+  }
+  TimingCell& timing_cell = timing_cell_map.at(driving_cell->get_cell_name());
+  if (timing_cell.get_library_name() != driving_cell->get_library_name()) {
+    return std::nullopt;
+  }
+  for (TimingCellArc& timing_cell_arc : timing_cell.get_cell_arc_list()) {
+    if (timing_cell_arc.get_source_port() != driving_cell->get_from_pin() || timing_cell_arc.get_sink_port() != driving_cell->get_to_pin()) {
+      continue;
+    }
+    DCTimingResult timing_result;
+    if (STADC.calculateDrivingCell(start_point, timing_cell_arc, analysis_type, trans_type, driving_cell->get_input_transition_rise(),
+                                   driving_cell->get_input_transition_fall(), timing_result)) {
+      return timing_result;
+    }
+  }
+  return std::nullopt;
 }
 
 double TimingPropagator::getStartPointLaunchTime(std::string& start_point, AnalysisType analysis_type)

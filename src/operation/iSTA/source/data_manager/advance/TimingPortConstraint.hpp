@@ -16,9 +16,48 @@
 // ***************************************************************************************
 #pragma once
 
+#include "AnalysisType.hpp"
 #include "STAHeader.hpp"
+#include "TransType.hpp"
 
 namespace ista {
+
+enum class TimingInputDriveType
+{
+  kNone,
+  kInputTransition,
+  kDrivingCell
+};
+
+class TimingDrivingCell
+{
+ public:
+  TimingDrivingCell() = default;
+  ~TimingDrivingCell() = default;
+  // getter
+  std::string& get_library_name() { return _library_name; }
+  std::string& get_cell_name() { return _cell_name; }
+  std::string& get_from_pin() { return _from_pin; }
+  std::string& get_to_pin() { return _to_pin; }
+  double get_input_transition_rise() const { return _input_transition_rise; }
+  double get_input_transition_fall() const { return _input_transition_fall; }
+  // setter
+  void set_library_name(const std::string& library_name) { _library_name = library_name; }
+  void set_cell_name(const std::string& cell_name) { _cell_name = cell_name; }
+  void set_from_pin(const std::string& from_pin) { _from_pin = from_pin; }
+  void set_to_pin(const std::string& to_pin) { _to_pin = to_pin; }
+  void set_input_transition_rise(const double input_transition_rise) { _input_transition_rise = input_transition_rise; }
+  void set_input_transition_fall(const double input_transition_fall) { _input_transition_fall = input_transition_fall; }
+  // function
+
+ private:
+  std::string _library_name;
+  std::string _cell_name;
+  std::string _from_pin;
+  std::string _to_pin;
+  double _input_transition_rise = 0.0;
+  double _input_transition_fall = 0.0;
+};
 
 class TimingPortConstraint
 {
@@ -33,12 +72,39 @@ class TimingPortConstraint
   double get_output_delay_max() const { return _output_delay_max; }
   double get_output_delay_min() const { return _output_delay_min; }
   double get_input_transition() const { return _input_transition; }
+  double get_input_transition(AnalysisType analysis_type, TransType trans_type) const
+  {
+    const auto analysis_iter = _input_transition_map.find(analysis_type);
+    if (analysis_iter != _input_transition_map.end()) {
+      const auto trans_iter = analysis_iter->second.find(trans_type);
+      if (trans_iter != analysis_iter->second.end()) {
+        return trans_iter->second;
+      }
+    }
+    return _input_transition;
+  }
   double get_load() const { return _load; }
   bool get_has_input_delay_max() const { return _has_input_delay_max; }
   bool get_has_input_delay_min() const { return _has_input_delay_min; }
   bool get_has_output_delay_max() const { return _has_output_delay_max; }
   bool get_has_output_delay_min() const { return _has_output_delay_min; }
   bool get_has_input_transition() const { return _has_input_transition; }
+  bool get_has_input_transition(AnalysisType analysis_type, TransType trans_type) const
+  {
+    return get_input_drive_type(analysis_type, trans_type) == TimingInputDriveType::kInputTransition;
+  }
+  bool get_has_driving_cell(AnalysisType analysis_type, TransType trans_type) const
+  {
+    return get_input_drive_type(analysis_type, trans_type) == TimingInputDriveType::kDrivingCell;
+  }
+  TimingDrivingCell* get_driving_cell(AnalysisType analysis_type, TransType trans_type)
+  {
+    if (get_input_drive_type(analysis_type, trans_type) != TimingInputDriveType::kDrivingCell || !_driving_cell_map.contains(analysis_type)
+        || !_driving_cell_map.at(analysis_type).contains(trans_type)) {
+      return nullptr;
+    }
+    return &_driving_cell_map.at(analysis_type).at(trans_type);
+  }
   bool get_has_load() const { return _has_load; }
   // setter
   void set_port_name(const std::string& port_name) { _port_name = port_name; }
@@ -47,7 +113,27 @@ class TimingPortConstraint
   void set_input_delay_min(const double input_delay_min) { _input_delay_min = input_delay_min; }
   void set_output_delay_max(const double output_delay_max) { _output_delay_max = output_delay_max; }
   void set_output_delay_min(const double output_delay_min) { _output_delay_min = output_delay_min; }
-  void set_input_transition(const double input_transition) { _input_transition = input_transition; }
+  void set_input_transition(const double input_transition)
+  {
+    _input_transition = input_transition;
+    for (AnalysisType analysis_type : {AnalysisType::kMin, AnalysisType::kMax}) {
+      for (TransType trans_type : {TransType::kRise, TransType::kFall}) {
+        set_input_transition(analysis_type, trans_type, input_transition);
+      }
+    }
+  }
+  void set_input_transition(AnalysisType analysis_type, TransType trans_type, const double input_transition)
+  {
+    _input_transition = input_transition;
+    _input_transition_map[analysis_type][trans_type] = input_transition;
+    _input_drive_type_map[analysis_type][trans_type] = TimingInputDriveType::kInputTransition;
+    _has_input_transition = true;
+  }
+  void set_driving_cell(AnalysisType analysis_type, TransType trans_type, const TimingDrivingCell& driving_cell)
+  {
+    _driving_cell_map[analysis_type][trans_type] = driving_cell;
+    _input_drive_type_map[analysis_type][trans_type] = TimingInputDriveType::kDrivingCell;
+  }
   void set_load(const double load) { _load = load; }
   void set_has_input_delay_max(const bool has_input_delay_max) { _has_input_delay_max = has_input_delay_max; }
   void set_has_input_delay_min(const bool has_input_delay_min) { _has_input_delay_min = has_input_delay_min; }
@@ -58,6 +144,18 @@ class TimingPortConstraint
   // function
 
  private:
+  TimingInputDriveType get_input_drive_type(AnalysisType analysis_type, TransType trans_type) const
+  {
+    const auto analysis_iter = _input_drive_type_map.find(analysis_type);
+    if (analysis_iter != _input_drive_type_map.end()) {
+      const auto trans_iter = analysis_iter->second.find(trans_type);
+      if (trans_iter != analysis_iter->second.end()) {
+        return trans_iter->second;
+      }
+    }
+    return _has_input_transition ? TimingInputDriveType::kInputTransition : TimingInputDriveType::kNone;
+  }
+
   std::string _port_name;
   std::string _clock_name;
   double _input_delay_max = 0.0;
@@ -65,6 +163,9 @@ class TimingPortConstraint
   double _output_delay_max = 0.0;
   double _output_delay_min = 0.0;
   double _input_transition = 0.0;
+  std::map<AnalysisType, std::map<TransType, double>> _input_transition_map;
+  std::map<AnalysisType, std::map<TransType, TimingInputDriveType>> _input_drive_type_map;
+  std::map<AnalysisType, std::map<TransType, TimingDrivingCell>> _driving_cell_map;
   double _load = 0.0;
   bool _has_input_delay_max = false;
   bool _has_input_delay_min = false;
