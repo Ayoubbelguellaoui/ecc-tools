@@ -124,22 +124,22 @@ void DetailedRouter::routeDRModel(DRModel& dr_model)
   double violation_unit = 4 * non_prefer_wire_unit * cost_unit;
   /**
    * prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, size, offset, schedule_interval, fixed_rect_unit, routed_rect_unit,
-   * violation_unit, max_routed_times, max_candidate_patch_num, refine_net_num
+   * violation_unit, max_routed_times, max_candidate_patch_num, refine_net_num, all_violation_update
    */
   std::vector<DRIterParam> dr_iter_param_list;
   // clang-format off
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 18, 0, 3, fixed_rect_unit, routed_rect_unit, violation_unit, 3, 10, 32);
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 18, 6, 3, fixed_rect_unit, routed_rect_unit, violation_unit, 3, 10, 32);
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 18, 12, 3, fixed_rect_unit, routed_rect_unit, violation_unit, 3, 10, 32);
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 15, 0, 3, 2 * fixed_rect_unit, 2 * routed_rect_unit, 2 * violation_unit, 9, 10);
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 15, 5, 3, 2 * fixed_rect_unit, 2 * routed_rect_unit, 2 * violation_unit, 9, 10);
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 15, 10, 3, 2 * fixed_rect_unit, 2 * routed_rect_unit, 2 * violation_unit, 9, 10);
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 18, 0, 3, 4 * fixed_rect_unit, 4 * routed_rect_unit, 4 * violation_unit, 18, 10);
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 18, 6, 3, 4 * fixed_rect_unit, 4 * routed_rect_unit, 4 * violation_unit, 18, 10);
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 18, 12, 3, 4 * fixed_rect_unit, 4 * routed_rect_unit, 4 * violation_unit, 18, 10);
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 24, 0, 3, 8 * fixed_rect_unit, 8 * routed_rect_unit, 8 * violation_unit, 36, 10);
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 24, 8, 3, 8 * fixed_rect_unit, 8 * routed_rect_unit, 8 * violation_unit, 36, 10);
-  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 24, 16, 3, 8 * fixed_rect_unit, 8 * routed_rect_unit, 8 * violation_unit, 36, 10);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 18, 0, 3, fixed_rect_unit, routed_rect_unit, violation_unit, 3, 10, 0);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 18, 6, 3, fixed_rect_unit, routed_rect_unit, violation_unit, 3, 10, 0);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 18, 12, 3, fixed_rect_unit, routed_rect_unit, violation_unit, 3, 10, 0);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 15, 0, 3, 2 * fixed_rect_unit, 2 * routed_rect_unit, 2 * violation_unit, 9, 10, 0);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 15, 5, 3, 2 * fixed_rect_unit, 2 * routed_rect_unit, 2 * violation_unit, 9, 10, 0);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 15, 10, 3, 2 * fixed_rect_unit, 2 * routed_rect_unit, 2 * violation_unit, 9, 10, 0);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 18, 0, 3, 4 * fixed_rect_unit, 4 * routed_rect_unit, 4 * violation_unit, 18, 10, 0, true);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 18, 6, 3, 4 * fixed_rect_unit, 4 * routed_rect_unit, 4 * violation_unit, 18, 10, 0, true);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 18, 12, 3, 4 * fixed_rect_unit, 4 * routed_rect_unit, 4 * violation_unit, 18, 10, 0, true);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 24, 0, 3, 8 * fixed_rect_unit, 8 * routed_rect_unit, 8 * violation_unit, 36, 10, 0, true);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 24, 8, 3, 8 * fixed_rect_unit, 8 * routed_rect_unit, 8 * violation_unit, 36, 10, 0, true);
+  dr_iter_param_list.emplace_back(prefer_wire_unit, non_prefer_wire_unit, bend_unit, via_unit, 24, 16, 3, 8 * fixed_rect_unit, 8 * routed_rect_unit, 8 * violation_unit, 36, 10, 0, true);
   // clang-format on
   dr_model.set_refine_enabled(std::ranges::any_of(dr_iter_param_list, [](const DRIterParam& dr_iter_param) {
     return dr_iter_param.get_refine_net_num() > 0;
@@ -196,6 +196,7 @@ void DetailedRouter::setDRIterParam(DRModel& dr_model, int32_t iter, DRIterParam
   RTLOG.info(Loc::current(), "max_routed_times: ", dr_iter_param.get_max_routed_times());
   RTLOG.info(Loc::current(), "max_candidate_patch_num: ", dr_iter_param.get_max_candidate_patch_num());
   RTLOG.info(Loc::current(), "refine_net_num: ", dr_iter_param.get_refine_net_num());
+  RTLOG.info(Loc::current(), "all_violation_update: ", dr_iter_param.get_all_violation_update());
   dr_model.set_dr_iter_param(dr_iter_param);
 }
 
@@ -3852,12 +3853,21 @@ void DetailedRouter::updateRoutedRectToGraph(DRBox& dr_box, ChangeType change_ty
 void DetailedRouter::addRouteViolationToGraph(DRBox& dr_box, Violation& violation)
 {
   const std::set<int32_t>& violation_net_set = violation.get_violation_net_set();
-  if (violation_net_set.size() != 1 || *violation_net_set.begin() == 0) {
+  std::set<int32_t> target_net_set;
+  if (dr_box.get_dr_iter_param()->get_all_violation_update()) {
+    for (int32_t net_idx : violation_net_set) {
+      if (net_idx != -1) {
+        target_net_set.insert(net_idx);
+      }
+    }
+  } else if (violation_net_set.size() == 1 && *violation_net_set.begin() != -1) {
+    target_net_set.insert(*violation_net_set.begin());
+  }
+  if (target_net_set.empty()) {
     return;
   }
   LayerRect searched_rect = violation.get_violation_shape().get_real_rect();
   std::vector<Segment<LayerCoord>> overlap_segment_list;
-  const int32_t target_net_idx = *violation_net_set.begin();
   std::set<int32_t> found_net_set;
   int32_t searched_times = 0;
   constexpr int32_t max_searched_times = 3;
@@ -3870,7 +3880,7 @@ void DetailedRouter::addRouteViolationToGraph(DRBox& dr_box, Violation& violatio
       RTLOG.error(Loc::current(), "The violation layer is cut!");
     }
     for (auto& [net_idx, segment_list] : dr_box.get_curr_result().get_net_own_result_map()) {
-      if (net_idx != target_net_idx || RTUTIL.exist(found_net_set, net_idx)) {
+      if (!RTUTIL.exist(target_net_set, net_idx) || RTUTIL.exist(found_net_set, net_idx)) {
         continue;
       }
       for (Segment<LayerCoord>& segment : segment_list) {
@@ -3887,7 +3897,7 @@ void DetailedRouter::addRouteViolationToGraph(DRBox& dr_box, Violation& violatio
         }
       }
     }
-    if (RTUTIL.exist(found_net_set, target_net_idx)) {
+    if (found_net_set.size() == target_net_set.size()) {
       break;
     }
     if (searched_times >= max_searched_times) {
