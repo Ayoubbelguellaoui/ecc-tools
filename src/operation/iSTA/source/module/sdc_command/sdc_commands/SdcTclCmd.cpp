@@ -93,6 +93,7 @@ int SdcTclCmd::execute(Tcl_Interp* interp, int objc, Tcl_Obj* const objv[])
 
 void SdcTclCmd::setOptionValue(ecc::TclOption* option, const char* value)
 {
+  _option_value_list.emplace_back(option->get_option_name(), value);
   if (option->isDoubleOption()) {
     double number = 0.0;
     if (Tcl_GetDouble(nullptr, value, &number) != TCL_OK || !std::isfinite(number)) {
@@ -126,6 +127,7 @@ void SdcTclCmd::resetExecutionState()
   _error_message.clear();
   _result.clear();
   _list_result.clear();
+  _option_value_list.clear();
   _has_result = false;
   _has_list_result = false;
 }

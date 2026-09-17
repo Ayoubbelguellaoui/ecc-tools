@@ -4,6 +4,8 @@ add_library(ista_sdc_command
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetClockTransition.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetMaxFanout.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/CreateGeneratedClock.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/GetCells.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/GetNets.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/GetPins.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/AllPorts.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetClockGroups.cpp
@@ -18,6 +20,7 @@ add_library(ista_sdc_command
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetInputDelay.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetOutputDelay.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetInputTransition.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/SetDrivingCell.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetLoad.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetClockUncertainty.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetPropagatedClock.cpp
