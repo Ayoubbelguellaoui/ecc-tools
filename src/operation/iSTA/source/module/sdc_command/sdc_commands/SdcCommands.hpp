@@ -16,7 +16,7 @@
 // ***************************************************************************************
 #pragma once
 
-#include "SdcTclCmd.hpp"
+#include "PathExceptionCommand.hpp"
 
 namespace ista::sdc {
 
@@ -92,10 +92,49 @@ class TclAllOutputs : public SdcTclCmd
   unsigned exec() override;
 };
 
-class TclSetFalsePath : public SdcTclCmd
+class TclSetFalsePath : public TclPathException
 {
  public:
   TclSetFalsePath(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclSetPathDelay : public TclPathException
+{
+ protected:
+  TclSetPathDelay(const char* cmd_name, ClientData client_data);
+  unsigned executePathDelay(TimingExceptionType type);
+};
+
+class TclSetMaxDelay : public TclSetPathDelay
+{
+ public:
+  TclSetMaxDelay(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclSetMinDelay : public TclSetPathDelay
+{
+ public:
+  TclSetMinDelay(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclSetMulticyclePath : public TclPathException
+{
+ public:
+  TclSetMulticyclePath(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclResetPath : public TclPathException
+{
+ public:
+  TclResetPath(const char* cmd_name, ClientData client_data);
   unsigned check() override { return 1; }
   unsigned exec() override;
 };

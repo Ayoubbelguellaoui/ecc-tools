@@ -20,6 +20,7 @@
 #include "DelayCalculator.hpp"
 #include "Logger.hpp"
 #include "Monitor.hpp"
+#include "TimingExceptionMatcher.hpp"
 #include "Utility.hpp"
 
 namespace ista {
@@ -1229,10 +1230,10 @@ TimingPathState* TimingAnalyzer::updateDiversionPathState(std::string& pin_name,
 {
   Database& database = STADM.getDatabase();
   TimingPoint& timing_point = database.get_timing_point_map()[pin_name];
-  const std::vector<int32_t> false_path_state_list
-      = STAUTIL.advanceFalsePathState(database, source_path_state.get_false_path_state_list(), pin_name, trans_type);
+  const std::vector<int32_t> exception_state_list
+      = TimingExceptionMatcher::advanceState(database, source_path_state.get_exception_state_list(), pin_name, trans_type);
   const std::string path_state_tag
-      = STAUTIL.getPathStateTag(database, source_path_state.get_start_point(), source_path_state.get_clock_name(), false_path_state_list);
+      = TimingExceptionMatcher::makePathStateTag(database, source_path_state.get_start_point(), source_path_state.get_clock_name(), exception_state_list);
   std::map<std::string, TimingPathState>& path_state_map = getPathStateMap(timing_point, analysis_type, source_type, trans_type);
   if (path_state_map.count(path_state_tag) > 0 && !isBetterArrival(arrival, path_state_map[path_state_tag].get_arrival(), analysis_type)) {
     return nullptr;
@@ -1249,7 +1250,7 @@ TimingPathState* TimingAnalyzer::updateDiversionPathState(std::string& pin_name,
   path_state.set_crpr_clock_pin(source_path_state.get_crpr_clock_pin());
   path_state.set_path_state_tag(path_state_tag);
   path_state.set_predecessor_path_state_tag(source_path_state.get_path_state_tag());
-  path_state.set_false_path_state_list(false_path_state_list);
+  path_state.set_exception_state_list(exception_state_list);
   path_state.set_trans_type(trans_type);
   path_state.set_predecessor_trans_type(predecessor_trans_type);
   path_state.set_crpr_clock_trans_type(source_path_state.get_crpr_clock_trans_type());
@@ -1285,8 +1286,9 @@ TimingPathState* TimingAnalyzer::getWorstSlackPathState(std::string& end_point, 
         continue;
       }
       const TransType capture_clock_trans_type = timing_check_arc == nullptr ? TransType::kRise : getClockTransType(*timing_check_arc);
-      if (STAUTIL.isFalsePath(database, path_state.get_start_point(), path_state.get_clock_name(), end_point, getClockName(end_point), analysis_type,
-                             path_state.get_trans_type(), capture_clock_trans_type, path_state.get_false_path_state_list())) {
+      if (TimingExceptionMatcher::isFalsePath(database, path_state.get_start_point(), path_state.get_clock_name(), end_point, getClockName(end_point),
+                                              analysis_type, path_state.get_trans_type(), capture_clock_trans_type,
+                                              path_state.get_exception_state_list())) {
         continue;
       }
       double required_time = calcPathRequiredTime(end_point, path_state, analysis_type);
@@ -1302,7 +1304,72 @@ TimingPathState* TimingAnalyzer::getWorstSlackPathState(std::string& end_point, 
 
 double TimingAnalyzer::calcPathRequiredTime(std::string& end_point, TimingPathState& end_path_state, AnalysisType analysis_type)
 {
-  return getEndPointRequired(end_path_state, end_point, end_path_state.get_arrival(), analysis_type);
+  const double normal_required_time = getEndPointRequired(end_path_state, end_point, end_path_state.get_arrival(), analysis_type);
+  TimingCheckArc* timing_check_arc = getEndPointCheckArc(end_point, analysis_type);
+  const TransType capture_clock_trans_type = timing_check_arc == nullptr ? TransType::kRise : getClockTransType(*timing_check_arc);
+  const ResolvedTimingExceptions exceptions
+      = TimingExceptionMatcher::resolve(STADM.getDatabase(), end_path_state.get_start_point(), end_path_state.get_clock_name(), end_point,
+                                        getClockName(end_point), analysis_type, end_path_state.get_trans_type(), capture_clock_trans_type,
+                                        end_path_state.get_exception_state_list());
+  if (exceptions.path_delay != nullptr) {
+    return calcPathDelayRequiredTime(end_point, end_path_state, analysis_type, *exceptions.path_delay, normal_required_time);
+  }
+  if (exceptions.setup_multicycle != nullptr || exceptions.hold_multicycle != nullptr) {
+    return calcMulticycleRequiredTime(end_point, end_path_state, analysis_type, exceptions, normal_required_time);
+  }
+  return normal_required_time;
+}
+
+double TimingAnalyzer::calcPathDelayRequiredTime(std::string& end_point, TimingPathState& end_path_state, AnalysisType analysis_type,
+                                                 const TimingException& exception, double normal_required_time)
+{
+  Database& database = STADM.getDatabase();
+  const double normal_capture_time = getEndPointCaptureTime(end_path_state.get_start_point(), end_point, analysis_type);
+  double endpoint_margin = normal_required_time - normal_capture_time;
+  Pin& pin = database.get_pin_map()[end_point];
+  if (pin.get_is_port()) {
+    const auto constraint = database.get_timing_constraint().get_port_constraint_map().find(end_point);
+    const bool has_delay
+        = constraint != database.get_timing_constraint().get_port_constraint_map().end()
+          && (constraint->second.get_has_output_delay_max()
+              || (analysis_type == AnalysisType::kMin && constraint->second.get_has_output_delay_min()));
+    if (!has_delay) {
+      endpoint_margin = 0.0;
+    }
+  }
+
+  double anchor = end_path_state.get_launch_time();
+  if (!exception.get_ignore_clock_latency()) {
+    TimingCheckArc* timing_check_arc = getEndPointCheckArc(end_point, analysis_type);
+    const TransType capture_transition = timing_check_arc == nullptr ? TransType::kRise : getClockTransType(*timing_check_arc);
+    anchor = STAUTIL.getLaunchClockEdge(database, end_path_state.get_start_point(), end_path_state.get_clock_name())
+             + getEndPointClockArrival(end_point, getCaptureAnalysisType(analysis_type), capture_transition);
+  }
+  return roundTime(anchor + exception.get_delay() + endpoint_margin);
+}
+
+double TimingAnalyzer::calcMulticycleRequiredTime(std::string& end_point, TimingPathState& end_path_state, AnalysisType analysis_type,
+                                                  const ResolvedTimingExceptions& exceptions, double normal_required_time)
+{
+  double adjustment = 0.0;
+  if (exceptions.setup_multicycle != nullptr && exceptions.setup_multicycle->get_setup_multiplier().has_value()) {
+    const TimingException& setup = *exceptions.setup_multicycle;
+    adjustment += (*setup.get_setup_multiplier() - 1) * getExceptionClockPeriod(end_point, end_path_state, setup.get_setup_use_end_clock());
+  }
+  if (analysis_type == AnalysisType::kMin && exceptions.hold_multicycle != nullptr
+      && exceptions.hold_multicycle->get_hold_multiplier().has_value()) {
+    const TimingException& hold = *exceptions.hold_multicycle;
+    adjustment -= *hold.get_hold_multiplier() * getExceptionClockPeriod(end_point, end_path_state, hold.get_hold_use_end_clock());
+  }
+  return roundTime(normal_required_time + adjustment);
+}
+
+double TimingAnalyzer::getExceptionClockPeriod(std::string& end_point, TimingPathState& end_path_state, bool use_end_clock)
+{
+  Database& database = STADM.getDatabase();
+  const std::string clock_name = use_end_clock ? std::string(getClockName(end_point)) : end_path_state.get_clock_name();
+  const auto clock = database.get_timing_constraint().get_clock_map().find(clock_name);
+  return clock == database.get_timing_constraint().get_clock_map().end() ? 0.0 : clock->second.get_period();
 }
 
 double TimingAnalyzer::calcPathSlack(TimingPathState& end_path_state, double required_time, AnalysisType analysis_type)
@@ -1381,14 +1448,15 @@ TimingPath TimingAnalyzer::buildTimingPath(std::string& end_point, AnalysisType 
   buildPathTrace(end_point, analysis_type, source_type, end_path_state, path_pin_name_list, path_trans_type_list, path_state_tag_list);
   std::vector<std::size_t> path_arc_idx_list
       = getPathArcIdxList(path_pin_name_list, path_trans_type_list, path_state_tag_list, analysis_type, source_type);
-  double required_time = getEndPointRequired(end_path_state, end_point, end_path_state.get_arrival(), analysis_type);
-  double slack
-      = analysis_type == AnalysisType::kMin ? roundTime(end_path_state.get_arrival() - required_time) : roundTime(required_time - end_path_state.get_arrival());
+  const double normal_required_time = getEndPointRequired(end_path_state, end_point, end_path_state.get_arrival(), analysis_type);
+  double required_time = calcPathRequiredTime(end_point, end_path_state, analysis_type);
+  double slack = calcPathSlack(end_path_state, required_time, analysis_type);
   TimingPath timing_path;
   timing_path.set_start_point(start_point);
   timing_path.set_end_point(end_point);
   timing_path.set_path_delay(end_path_state.get_arrival());
   timing_path.set_required_time(required_time);
+  timing_path.set_required_time_adjustment(roundTime(required_time - normal_required_time));
   timing_path.set_slack(slack);
   timing_path.set_level(database.get_timing_point_map()[end_point].get_level());
   timing_path.set_analysis_type(analysis_type);

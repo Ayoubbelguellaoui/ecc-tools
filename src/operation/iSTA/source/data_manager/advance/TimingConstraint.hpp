@@ -33,7 +33,9 @@ class TimingConstraint
   std::map<std::string, TimingClock>& get_clock_map() { return _clock_map; }
   std::map<std::string, TimingPortConstraint>& get_port_constraint_map() { return _port_constraint_map; }
   std::map<std::string, bool>& get_case_analysis_map() { return _case_analysis_map; }
-  std::vector<TimingException>& get_false_path_list() { return _false_path_list; }
+  std::vector<TimingException>& get_path_exception_list() { return _path_exception_list; }
+  // Compatibility alias for callers written before path exceptions shared one model.
+  std::vector<TimingException>& get_false_path_list() { return _path_exception_list; }
   std::vector<TimingClockGroup>& get_clock_group_list() { return _clock_group_list; }
   std::optional<double>& get_max_fanout() { return _max_fanout; }
   std::map<std::string, double>& get_port_max_fanout_map() { return _port_max_fanout_map; }
@@ -45,7 +47,7 @@ class TimingConstraint
   // function
 
  private:
-  std::vector<TimingException> _false_path_list;
+  std::vector<TimingException> _path_exception_list;
   std::vector<TimingClockGroup> _clock_group_list;
   std::string _sdc_file_path;
   std::map<std::string, TimingClock> _clock_map;

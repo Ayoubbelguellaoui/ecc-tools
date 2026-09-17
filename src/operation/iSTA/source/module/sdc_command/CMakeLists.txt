@@ -9,7 +9,11 @@ add_library(ista_sdc_command
     ${ISTA_MODULE}/sdc_command/sdc_commands/GetPins.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/AllPorts.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetClockGroups.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/PathExceptionCommand.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetFalsePath.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/SetPathDelay.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/SetMulticyclePath.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/ResetPath.cpp
     ${ISTA_MODULE}/sdc_command/SdcCommand.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SdcTclCmd.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SdcCommandUtils.cpp

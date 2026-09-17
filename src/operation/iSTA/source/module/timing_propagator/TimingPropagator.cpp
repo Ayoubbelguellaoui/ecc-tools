@@ -20,6 +20,7 @@
 #include "DelayCalculator.hpp"
 #include "Logger.hpp"
 #include "Monitor.hpp"
+#include "TimingExceptionMatcher.hpp"
 #include "Utility.hpp"
 
 namespace ista {
@@ -615,11 +616,11 @@ void TimingPropagator::seedPathState(std::string& start_point, AnalysisType anal
   std::string clock_name{getClockName(start_point)};
   TimingPoint& timing_point = database.get_timing_point_map()[start_point];
   for (TransType trans_type : {TransType::kRise, TransType::kFall}) {
-    const std::vector<int32_t> initial_false_path_state_list
-        = STAUTIL.initFalsePathState(database, path_state_start_point, clock_name, trans_type, analysis_type);
-    const std::vector<int32_t> false_path_state_list
-        = STAUTIL.advanceFalsePathState(database, initial_false_path_state_list, start_point, trans_type);
-    const std::string path_state_tag = STAUTIL.getPathStateTag(database, path_state_start_point, clock_name, false_path_state_list);
+    const std::vector<int32_t> initial_exception_state_list
+        = TimingExceptionMatcher::initState(database, path_state_start_point, clock_name, trans_type, analysis_type);
+    const std::vector<int32_t> exception_state_list
+        = TimingExceptionMatcher::advanceState(database, initial_exception_state_list, start_point, trans_type);
+    const std::string path_state_tag = TimingExceptionMatcher::makePathStateTag(database, path_state_start_point, clock_name, exception_state_list);
     double arrival = getStartPointArrival(start_point, analysis_type, trans_type);
     std::map<std::string, TimingPathState>& path_state_map = getPathStateMap(timing_point, analysis_type, source_type, trans_type);
     if (path_state_map.count(path_state_tag) > 0 && !isBetterArrival(arrival, path_state_map[path_state_tag].get_arrival(), analysis_type)) {
@@ -635,7 +636,7 @@ void TimingPropagator::seedPathState(std::string& start_point, AnalysisType anal
     path_state.set_crpr_clock_pin(getStartPointCrprClockPin(start_point));
     path_state.set_path_state_tag(path_state_tag);
     path_state.set_predecessor_path_state_tag("");
-    path_state.set_false_path_state_list(false_path_state_list);
+    path_state.set_exception_state_list(exception_state_list);
     path_state.get_predecessor().clear();
     path_state.set_predecessor_arc_idx(std::numeric_limits<std::size_t>::max());
     path_state.set_predecessor_arc_delay(0.0);
@@ -763,10 +764,10 @@ void TimingPropagator::propagatePathStateArc(std::size_t arc_idx, AnalysisType a
     }
     double arc_delay = getArcDelay(arc, analysis_type, input_trans_type, output_trans_type);
     double candidate_arrival = roundTime(source_path_state.get_arrival() + arc_delay);
-    const std::vector<int32_t> false_path_state_list
-        = STAUTIL.advanceFalsePathState(database, source_path_state.get_false_path_state_list(), arc.get_sink_pin(), output_trans_type);
+    const std::vector<int32_t> exception_state_list
+        = TimingExceptionMatcher::advanceState(database, source_path_state.get_exception_state_list(), arc.get_sink_pin(), output_trans_type);
     const std::string path_state_tag
-        = STAUTIL.getPathStateTag(database, source_path_state.get_start_point(), source_path_state.get_clock_name(), false_path_state_list);
+        = TimingExceptionMatcher::makePathStateTag(database, source_path_state.get_start_point(), source_path_state.get_clock_name(), exception_state_list);
     std::map<std::string, TimingPathState>& sink_path_state_map = getPathStateMap(sink_point, analysis_type, source_type, output_trans_type);
     if (sink_path_state_map.count(path_state_tag) == 0
         || isBetterArrival(candidate_arrival, sink_path_state_map[path_state_tag].get_arrival(), analysis_type)) {
@@ -782,7 +783,7 @@ void TimingPropagator::propagatePathStateArc(std::size_t arc_idx, AnalysisType a
       sink_path_state.set_crpr_clock_pin(source_path_state.get_crpr_clock_pin());
       sink_path_state.set_path_state_tag(path_state_tag);
       sink_path_state.set_predecessor_path_state_tag(source_path_state_pair.first);
-      sink_path_state.set_false_path_state_list(false_path_state_list);
+      sink_path_state.set_exception_state_list(exception_state_list);
       sink_path_state.set_trans_type(output_trans_type);
       sink_path_state.set_predecessor_trans_type(input_trans_type);
       sink_path_state.set_crpr_clock_trans_type(source_path_state.get_crpr_clock_trans_type());

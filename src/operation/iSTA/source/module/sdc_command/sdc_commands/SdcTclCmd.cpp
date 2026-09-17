@@ -104,6 +104,15 @@ void SdcTclCmd::setOptionValue(ecc::TclOption* option, const char* value)
     option->setVal(number_stream.str().c_str());
     return;
   }
+  if (option->isIntOption()) {
+    int number = 0;
+    if (Tcl_GetInt(nullptr, value, &number) != TCL_OK) {
+      throw std::invalid_argument(std::string(option->get_option_name()) + " requires an integer: " + value);
+    }
+    const std::string canonical = std::to_string(number);
+    option->setVal(canonical.c_str());
+    return;
+  }
   option->setVal(value);
 }
 

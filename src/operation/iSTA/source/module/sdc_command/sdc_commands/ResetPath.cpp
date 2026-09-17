@@ -19,23 +19,18 @@
 
 namespace ista::sdc {
 
-TclSetFalsePath::TclSetFalsePath(const char* cmd_name, ClientData client_data) : TclPathException(cmd_name, client_data, true)
+TclResetPath::TclResetPath(const char* cmd_name, ClientData client_data) : TclPathException(cmd_name, client_data, false)
 {
   addOption(new ecc::TclSwitchOption("-setup"));
   addOption(new ecc::TclSwitchOption("-hold"));
-  addOption(new ecc::TclSwitchOption("-reset_path"));
 }
 
-unsigned TclSetFalsePath::exec()
+unsigned TclResetPath::exec()
 {
   Database& database = STADM.getDatabase();
-  TimingException exception = parsePathSelector(database, true);
-  exception.set_type(TimingExceptionType::kFalsePath);
-  applyAnalysisQualifiers(exception);
-  if (getOptionOrArg("-reset_path")->is_set_val()) {
-    resetPathExceptions(database, exception);
-  }
-  database.get_timing_constraint().get_path_exception_list().push_back(std::move(exception));
+  TimingException filter = parsePathSelector(database, true);
+  applyAnalysisQualifiers(filter);
+  resetPathExceptions(database, filter);
   return 1;
 }
 

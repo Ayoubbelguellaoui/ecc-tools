@@ -14,29 +14,27 @@
 //
 // See the Mulan PSL v2 for more details.
 // ***************************************************************************************
-#include "DataManager.hpp"
-#include "SdcCommands.hpp"
+#pragma once
+
+#include "SdcTclCmd.hpp"
+#include "TimingException.hpp"
+
+namespace ista {
+class Database;
+}
 
 namespace ista::sdc {
 
-TclSetFalsePath::TclSetFalsePath(const char* cmd_name, ClientData client_data) : TclPathException(cmd_name, client_data, true)
+class TclPathException : public SdcTclCmd
 {
-  addOption(new ecc::TclSwitchOption("-setup"));
-  addOption(new ecc::TclSwitchOption("-hold"));
-  addOption(new ecc::TclSwitchOption("-reset_path"));
-}
+ public:
+  TclPathException(const char* cmd_name, ClientData client_data, bool comment_option);
 
-unsigned TclSetFalsePath::exec()
-{
-  Database& database = STADM.getDatabase();
-  TimingException exception = parsePathSelector(database, true);
-  exception.set_type(TimingExceptionType::kFalsePath);
-  applyAnalysisQualifiers(exception);
-  if (getOptionOrArg("-reset_path")->is_set_val()) {
-    resetPathExceptions(database, exception);
-  }
-  database.get_timing_constraint().get_path_exception_list().push_back(std::move(exception));
-  return 1;
-}
+ protected:
+  TimingException parsePathSelector(Database& database, bool require_selector);
+  void applyAnalysisQualifiers(TimingException& exception);
+};
+
+void resetPathExceptions(Database& database, const TimingException& filter);
 
 }  // namespace ista::sdc

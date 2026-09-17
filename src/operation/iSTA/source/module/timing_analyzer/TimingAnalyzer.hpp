@@ -133,6 +133,11 @@ class TimingAnalyzer
   double getDataSlew(TimingPoint& timing_point, AnalysisType analysis_type, TransType trans_type);
   TimingPathState* getWorstSlackPathState(std::string& end_point, AnalysisType analysis_type, PathSourceType source_type);
   double calcPathRequiredTime(std::string& end_point, TimingPathState& end_path_state, AnalysisType analysis_type);
+  double calcPathDelayRequiredTime(std::string& end_point, TimingPathState& end_path_state, AnalysisType analysis_type,
+                                   const TimingException& exception, double normal_required_time);
+  double calcMulticycleRequiredTime(std::string& end_point, TimingPathState& end_path_state, AnalysisType analysis_type,
+                                    const ResolvedTimingExceptions& exceptions, double normal_required_time);
+  double getExceptionClockPeriod(std::string& end_point, TimingPathState& end_path_state, bool use_end_clock);
   double calcPathSlack(TimingPathState& end_path_state, double required_time, AnalysisType analysis_type);
   bool isConstrainedEndPoint(std::string& end_point);
   bool isOutputEndPoint(std::string& end_point);
