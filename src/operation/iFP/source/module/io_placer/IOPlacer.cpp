@@ -184,12 +184,6 @@ void IOPlacer::placeIOPinsFromFile(const std::string& file_path)
     FPLOG.error(Loc::current(), "Input IO pin placement requires horizontal and vertical routing layers!");
   }
 
-  int32_t horizontal_depth = 4 * getTrackPitch(vertical_layer_name);
-  int32_t vertical_depth = 4 * getTrackPitch(horizontal_layer_name);
-  if (horizontal_depth <= 0 || vertical_depth <= 0) {
-    FPLOG.error(Loc::current(), "Failed to determine valid IO pin depths!");
-  }
-
   std::ifstream placement_file(file_path);
   if (!placement_file.is_open()) {
     FPLOG.error(Loc::current(), "Failed to open IO pin placement file '", file_path, "'!");
@@ -269,8 +263,8 @@ void IOPlacer::placeIOPinsFromFile(const std::string& file_path)
       FPLOG.error(Loc::current(), "IO pin '", pin_name, "' is outside the legal core-edge range at line ", line_num, "!");
     }
 
-    placement_list.push_back(
-        {pin_iter->second, line_num, edge_type, along_coord, width, vertical_edge ? horizontal_depth : vertical_depth, layer_name});
+    int32_t depth = calculatePinDepth(edge_type, width, vertical_edge ? vertical_layer_name : horizontal_layer_name);
+    placement_list.push_back({pin_iter->second, line_num, edge_type, along_coord, width, depth, layer_name});
   }
 
   if (placement_list.size() != io_pin_list.size()) {
@@ -339,11 +333,9 @@ void IOPlacer::autoPlacePins(std::vector<std::string>& layer_name_list)
   int32_t horizontal_pitch = getTrackPitch(horizontal_layer_name);
   int32_t vertical_pitch = getTrackPitch(vertical_layer_name);
   if (horizontal_width <= 0 || vertical_width <= 0 || horizontal_pitch <= 0 || vertical_pitch <= 0) {
+    FPLOG.error(Loc::current(), "IO pin widths and track pitches must be positive!");
     return;
   }
-
-  int32_t vertical_depth = 4 * horizontal_pitch;
-  int32_t horizontal_depth = 4 * vertical_pitch;
 
   std::vector<IOPin>& io_pin_list = database.get_io_pin_list();
   int32_t io_pin_num = static_cast<int32_t>(io_pin_list.size());
@@ -416,14 +408,13 @@ void IOPlacer::autoPlacePins(std::vector<std::string>& layer_name_list)
   for (size_t pin_idx = 0; pin_idx < io_pin_list.size(); ++pin_idx) {
     const PinSlot& slot = slot_list[pin_idx];
     bool vertical_edge = slot.edge_type == IOEdgeType::kLeft || slot.edge_type == IOEdgeType::kRight;
-    int32_t x = vertical_edge ? (slot.edge_type == IOEdgeType::kLeft ? die.get_ll_x() + horizontal_depth / 2
-                                                                    : die.get_ur_x() - horizontal_depth / 2)
-                              : slot.coord;
+    int32_t width = vertical_edge ? horizontal_width : vertical_width;
+    int32_t depth = calculatePinDepth(slot.edge_type, width, vertical_edge ? vertical_layer_name : horizontal_layer_name);
+    int32_t x = vertical_edge ? (slot.edge_type == IOEdgeType::kLeft ? die.get_ll_x() + depth / 2 : die.get_ur_x() - depth / 2)
+                             : slot.coord;
     int32_t y = vertical_edge ? slot.coord
-                              : (slot.edge_type == IOEdgeType::kBottom ? die.get_ll_y() + vertical_depth / 2
-                                                                       : die.get_ur_y() - vertical_depth / 2);
-    addIOPinPort(io_pin_list[pin_idx], slot.edge_type, x, y, vertical_edge ? horizontal_width : vertical_width,
-                 vertical_edge ? horizontal_depth : vertical_depth, vertical_edge ? horizontal_layer_name : vertical_layer_name);
+                              : (slot.edge_type == IOEdgeType::kBottom ? die.get_ll_y() + depth / 2 : die.get_ur_y() - depth / 2);
+    addIOPinPort(io_pin_list[pin_idx], slot.edge_type, x, y, width, depth, vertical_edge ? horizontal_layer_name : vertical_layer_name);
   }
 }
 
@@ -463,11 +454,52 @@ int32_t IOPlacer::getTrackOffset(std::string layer_name)
   return std::max(database.get_routing_layer_list()[iter->second].get_prefer_track_offset(), 0);
 }
 
+int32_t IOPlacer::calculatePinDepth(IOEdgeType edge_type, int32_t width, const std::string& access_layer_name)
+{
+  bool x_depth = edge_type == IOEdgeType::kLeft || edge_type == IOEdgeType::kRight;
+  if (!x_depth && edge_type != IOEdgeType::kBottom && edge_type != IOEdgeType::kTop) {
+    FPLOG.error(Loc::current(), "Cannot calculate IO pin depth for an invalid edge!");
+  }
+  int64_t pitch = getTrackPitch(access_layer_name);
+  int64_t offset = getTrackOffset(access_layer_name);
+  if (width <= 0 || pitch <= 0) {
+    FPLOG.error(Loc::current(), "IO pin width and access track pitch must be positive for layer '", access_layer_name, "'!");
+  }
+
+  const Die& die = FPDM.getDatabase().get_die();
+  int64_t low = x_depth ? die.get_ll_x() : die.get_ll_y();
+  int64_t high = x_depth ? die.get_ur_x() : die.get_ur_y();
+  bool increasing = edge_type == IOEdgeType::kLeft || edge_type == IOEdgeType::kBottom;
+  int64_t boundary = increasing ? low : high;
+  int64_t half_width = (static_cast<int64_t>(width) + 1) / 2;
+  // The final depth includes the inward half-width margin. Keep the same margin
+  // on the die-boundary side of the access point, then choose the nearest track.
+  int64_t min_distance = std::max(half_width, 2 * pitch - half_width);
+  int64_t target = boundary + (increasing ? min_distance : -min_distance);
+  int64_t remainder = (target - offset) % pitch;
+  if (remainder < 0) {
+    remainder += pitch;
+  }
+  int64_t access_coord = increasing ? target + (pitch - remainder) % pitch : target - remainder;
+  int64_t distance = increasing ? access_coord - boundary : boundary - access_coord;
+  int64_t depth = distance + half_width;
+
+  if (depth > std::numeric_limits<int32_t>::max()) {
+    FPLOG.error(Loc::current(), "IO pin depth is outside the supported DBU range for layer '", access_layer_name, "'!");
+  }
+  if (high <= low || depth > high - low) {
+    FPLOG.error(Loc::current(), "Cannot fit IO pin depth ", depth, " inside die on edge ", static_cast<int>(edge_type),
+                " with access layer '", access_layer_name, "'!");
+  }
+  return static_cast<int32_t>(depth);
+}
+
 void IOPlacer::placeIOPinsOnEdge(IOEdgeType edge_type, std::vector<IOPin>& io_pin_list, int32_t& io_pin_idx, int32_t edge_pin_num, std::string layer_name,
-                                 int32_t width, int32_t depth, int32_t access_pitch, int32_t track_offset, int32_t track_pitch)
+                                 int32_t width, const std::string& access_layer_name, int32_t access_pitch, int32_t track_offset, int32_t track_pitch)
 {
   Die& die = FPDM.getDatabase().get_die();
   Core& core = FPDM.getDatabase().get_core();
+  int32_t depth = calculatePinDepth(edge_type, width, access_layer_name);
   int32_t io_pin_num = static_cast<int32_t>(io_pin_list.size());
   int32_t side_pin_num = std::min(edge_pin_num, io_pin_num - io_pin_idx);
 
