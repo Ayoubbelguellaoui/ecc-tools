@@ -447,6 +447,9 @@ class LibertyReader
   auto* get_library_builder() { return _library_builder; }
 
  private:
+  template <typename Group>
+  unsigned visitPinGroup(Group* group);
+
   const char* getGroupAttriName(LibertyGroupStmt* group);
   unsigned visitStmtInGroup(LibertyGroupStmt* group);
 

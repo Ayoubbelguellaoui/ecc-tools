@@ -17,8 +17,111 @@
 #include "SdcCommandUtils.hpp"
 
 #include "STAHeader.hpp"
+#include "SdcCommand.hpp"
 
 namespace ista::sdc {
+
+std::vector<std::string> queryPatterns(const std::string& text, bool regexp)
+{
+  // OpenSTA SDC commonly passes one raw regexp; PT writers pass a Tcl list.
+  if (regexp && !text.empty() && text.front() != '{' && text.find('\\') != std::string::npos) {
+    return {text};
+  }
+  int count = 0;
+  const char** items = nullptr;
+  if (Tcl_SplitList(SdcCommand::getInst().getInterp(), text.c_str(), &count, &items) != TCL_OK) {
+    throw std::invalid_argument("invalid object pattern list");
+  }
+  std::vector<std::string> result(items, items + count);
+  Tcl_Free(reinterpret_cast<char*>(items));
+  return result;
+}
+
+std::vector<std::string> queryObjects(Database& database, const std::vector<std::string>& patterns, QueryObjectType type, bool regexp)
+{
+  std::map<std::string, std::string> names;
+  if (type == QueryObjectType::kClock || type == QueryObjectType::kAny) {
+    for (const auto& [name, clock] : database.get_timing_constraint().get_clock_map()) {
+      names[name] = name;
+    }
+  }
+  if (type == QueryObjectType::kPort || type == QueryObjectType::kPin || type == QueryObjectType::kAny) {
+    for (auto& [name, pin] : database.get_pin_map()) {
+      if ((type == QueryObjectType::kPort && !pin.get_is_port()) || (type == QueryObjectType::kPin && pin.get_is_port())) {
+        continue;
+      }
+      names[name] = name;
+      if (!pin.get_is_port()) {
+        names[pin.get_instance_name() + "/" + pin.get_pin_name()] = name;
+      }
+    }
+  }
+  if (type == QueryObjectType::kCell || type == QueryObjectType::kAny) {
+    for (const auto& [name, instance] : database.get_instance_map()) {
+      names[name] = name;
+    }
+  }
+  if (type == QueryObjectType::kNet || type == QueryObjectType::kAny) {
+    for (const auto& [name, net] : database.get_net_map()) {
+      names[name] = name;
+    }
+  }
+  std::set<std::string> found;
+  for (const std::string& pattern : patterns) {
+    if (!regexp && names.contains(pattern)) {
+      found.insert(names.at(pattern));
+      continue;
+    }
+    const std::string expression = "^(?:" + pattern + ")$";
+    if (regexp && Tcl_RegExpMatch(SdcCommand::getInst().getInterp(), "", expression.c_str()) < 0) {
+      throw std::invalid_argument("invalid regular expression: " + pattern);
+    }
+    for (const auto& [name, canonical] : names) {
+      if (regexp ? Tcl_RegExpMatch(SdcCommand::getInst().getInterp(), name.c_str(), expression.c_str()) == 1
+                 : Tcl_StringMatch(name.c_str(), pattern.c_str()) != 0) {
+        found.insert(canonical);
+      }
+    }
+  }
+  return {found.begin(), found.end()};
+}
+
+std::set<std::string> resolveClockObjects(Database& database, const std::vector<std::string>& objects)
+{
+  std::set<std::string> clocks;
+  for (const std::string& pattern : objects) {
+    const std::vector<std::string> matches = queryObjects(database, {pattern}, QueryObjectType::kClock);
+    if (matches.empty()) {
+      throw std::invalid_argument("clock '" + pattern + "' does not exist");
+    }
+    clocks.insert(matches.begin(), matches.end());
+  }
+  if (clocks.empty()) {
+    throw std::invalid_argument("a non-empty clock collection is required");
+  }
+  return clocks;
+}
+
+std::set<std::string> resolveExceptionObjects(Database& database, const std::vector<std::string>& objects)
+{
+  std::set<std::string> result;
+  for (const std::string& object : objects) {
+    if (database.get_pin_map().contains(object) || database.get_instance_map().contains(object) || database.get_net_map().contains(object)
+        || database.get_timing_constraint().get_clock_map().contains(object)) {
+      result.insert(object);
+      continue;
+    }
+    const std::vector<std::string> matches = queryObjects(database, {object}, QueryObjectType::kAny);
+    if (matches.empty()) {
+      throw std::invalid_argument("exception object not found: " + object);
+    }
+    result.insert(matches.begin(), matches.end());
+  }
+  if (result.empty()) {
+    throw std::invalid_argument("empty timing exception collection");
+  }
+  return result;
+}
 
 std::vector<std::string> resolveObjectList(Database& database, const std::vector<std::string>& object_list)
 {

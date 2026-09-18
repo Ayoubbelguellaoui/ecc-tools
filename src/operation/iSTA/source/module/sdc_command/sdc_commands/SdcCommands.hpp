@@ -20,6 +20,102 @@
 
 namespace ista::sdc {
 
+class TclCurrentDesign : public SdcTclCmd
+{
+ public:
+  TclCurrentDesign(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclRemoveFromCollection : public SdcTclCmd
+{
+ public:
+  TclRemoveFromCollection(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclSetClockTransition : public SdcTclCmd
+{
+ public:
+  TclSetClockTransition(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclSetMaxFanout : public SdcTclCmd
+{
+ public:
+  TclSetMaxFanout(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclGetPins : public SdcTclCmd
+{
+ public:
+  TclGetPins(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclGetCells : public SdcTclCmd
+{
+ public:
+  TclGetCells(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclGetNets : public SdcTclCmd
+{
+ public:
+  TclGetNets(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclAllInputs : public SdcTclCmd
+{
+ public:
+  TclAllInputs(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclAllOutputs : public SdcTclCmd
+{
+ public:
+  TclAllOutputs(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclSetFalsePath : public SdcTclCmd
+{
+ public:
+  TclSetFalsePath(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclSetClockGroups : public SdcTclCmd
+{
+ public:
+  TclSetClockGroups(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclCreateGeneratedClock : public SdcTclCmd
+{
+ public:
+  TclCreateGeneratedClock(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
 class TclSetCaseAnalysis : public SdcTclCmd
 {
  public:
@@ -48,6 +144,14 @@ class TclSetInputTransition : public SdcTclCmd
 {
  public:
   TclSetInputTransition(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclSetDrivingCell : public SdcTclCmd
+{
+ public:
+  TclSetDrivingCell(const char* cmd_name, ClientData client_data);
   unsigned check() override { return 1; }
   unsigned exec() override;
 };

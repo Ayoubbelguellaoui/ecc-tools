@@ -16,7 +16,9 @@
 // ***************************************************************************************
 #pragma once
 
+#include "AnalysisType.hpp"
 #include "STAHeader.hpp"
+#include "TransType.hpp"
 
 namespace ista {
 
@@ -34,6 +36,10 @@ class TimingClock
   double get_setup_uncertainty() const { return _setup_uncertainty; }
   double get_hold_uncertainty() const { return _hold_uncertainty; }
   bool get_is_propagated() const { return _is_propagated; }
+  const std::string& get_master_clock_name() const { return _master_clock_name; }
+  const std::string& get_master_source() const { return _master_source; }
+  bool get_is_generated() const { return !_master_clock_name.empty(); }
+  std::map<AnalysisType, std::map<TransType, double>>& get_transition_map() { return _transition_map; }
   // setter
   void set_clock_name(const std::string& clock_name) { _clock_name = clock_name; }
   void set_source_list(const std::vector<std::string>& source_list) { _source_list = source_list; }
@@ -43,9 +49,13 @@ class TimingClock
   void set_setup_uncertainty(const double uncertainty) { _setup_uncertainty = uncertainty; }
   void set_hold_uncertainty(const double uncertainty) { _hold_uncertainty = uncertainty; }
   void set_is_propagated(const bool is_propagated) { _is_propagated = is_propagated; }
+  void set_master_clock_name(const std::string& name) { _master_clock_name = name; }
+  void set_master_source(const std::string& source) { _master_source = source; }
   // function
 
  private:
+  std::string _master_clock_name;
+  std::string _master_source;
   std::string _clock_name;
   std::vector<std::string> _source_list;
   double _period = 0.0;
@@ -54,6 +64,7 @@ class TimingClock
   double _setup_uncertainty = 0.0;
   double _hold_uncertainty = 0.0;
   bool _is_propagated = false;
+  std::map<AnalysisType, std::map<TransType, double>> _transition_map;
 };
 
 }  // namespace ista

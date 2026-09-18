@@ -238,7 +238,7 @@ LibTable& LibTable::operator=(LibTable&& rhs) noexcept
  * @Brief : get axes or template axes.
  * @return auto&
  */
-absl::InlinedVector<std::unique_ptr<LibAxis>, 64>& LibTable::get_axes()
+std::vector<std::unique_ptr<LibAxis>>& LibTable::get_axes()
 {
   if (_axes.empty()) {
     LibLutTableTemplate* table_template = get_table_template();
@@ -536,7 +536,7 @@ LibCurrentData::LibCurrentData(LibVectorTable* low_low, LibVectorTable* low_high
  */
 std::tuple<double, int> LibCurrentData::getSimulationTotalTimeAndNumPoints()
 {
-  absl::btree_map<double, int> total_simulation_times;
+  std::map<double, int> total_simulation_times;
 
   for (auto* table : {_low_low, _low_high, _high_low, _high_high}) {
     auto [total_time, num_point] = table->getSimulationTotalTimeAndNumPoints();
@@ -895,6 +895,23 @@ LibPort& LibPort::operator=(LibPort&& rhs) noexcept
   return *this;
 }
 
+void LibPort::inheritBusAttributes(const LibPort& bus)
+{
+  _port_type = bus._port_type;
+  _is_clock_pin = bus._is_clock_pin;
+  _clock_gate_clock_pin = bus._clock_gate_clock_pin;
+  _clock_gate_enable_pin = bus._clock_gate_enable_pin;
+  _is_clock = bus._is_clock;
+  _func_expr = bus._func_expr;
+  _func_expr_str = bus._func_expr_str;
+  _port_cap = bus._port_cap;
+  _port_caps = bus._port_caps;
+  _cap_limits = bus._cap_limits;
+  _slew_limits = bus._slew_limits;
+  _fanout_load = bus._fanout_load;
+  _max_fanout = bus._max_fanout;
+}
+
 /**
  * @brief Set cap of max/min, rise/fall.
  *
@@ -1067,6 +1084,17 @@ LibPortBus::LibPortBus(const char* port_bus_name) : LibPort(port_bus_name)
 {
 }
 
+LibPort* LibPortBus::operator[](int index)
+{
+  std::string port_name = std::string(get_port_name()) + "[" + std::to_string(index) + "]";
+  for (std::unique_ptr<LibPort>& port : _ports) {
+    if (port_name == port->get_port_name()) {
+      return port.get();
+    }
+  }
+  return nullptr;
+}
+
 LibLeakagePower::LibLeakagePower() : _owner_cell(nullptr)
 {
 }
@@ -1094,13 +1122,13 @@ LibLeakagePower& LibLeakagePower::operator=(LibLeakagePower&& rhs) noexcept
   return *this;
 }
 
-absl::btree_map<std::string, LibArc::TimingType> LibArc::_str_to_type = {{"setup_rising", TimingType::kSetupRising},
-                                                                          {"hold_rising", TimingType::kHoldRising},
-                                                                          {"recovery_rising", TimingType::kRecoveryRising},
-                                                                          {"removal_rising", TimingType::kRemovalRising},
-                                                                          {"rising_edge", TimingType::kRisingEdge},
-                                                                          {"preset", TimingType::kPreset},
-                                                                          {"clear", TimingType::kClear},
+std::map<std::string, LibArc::TimingType> LibArc::_str_to_type = {{"setup_rising", TimingType::kSetupRising},
+                                                                   {"hold_rising", TimingType::kHoldRising},
+                                                                   {"recovery_rising", TimingType::kRecoveryRising},
+                                                                   {"removal_rising", TimingType::kRemovalRising},
+                                                                   {"rising_edge", TimingType::kRisingEdge},
+                                                                   {"preset", TimingType::kPreset},
+                                                                   {"clear", TimingType::kClear},
                                                                   {"three_state_enable", TimingType::kThreeStateEnable},
                                                                   {"three_state_enable_rise", TimingType::kThreeStateEnableRise},
                                                                   {"three_state_enable_fall", TimingType::kThreeStateEnableFall},

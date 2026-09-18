@@ -24,7 +24,7 @@ else()
   add_library(tcl SHARED ${SRC})
 endif()
 
-target_link_libraries(tcl PUBLIC ${LINK_tcl} absl::inlined_vector ecc_logger)
+target_link_libraries(tcl PUBLIC ${LINK_tcl} ecc_logger)
 
 target_include_directories(tcl
     PUBLIC

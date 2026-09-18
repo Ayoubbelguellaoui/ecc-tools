@@ -35,7 +35,6 @@ target_link_libraries(
   PRIVATE
   icts_source_data_manager_io
   icts_source_toolkit_logger
-  absl::inlined_vector
   liberty
 )
 
@@ -110,7 +109,6 @@ target_link_libraries(
   PRIVATE
   icts_source_data_manager_adapter_fast_sta_clock_net_parasitic
   icts_source_data_manager_adapter_fast_sta_liberty_model
-  absl::fixed_array
 )
 
 target_include_directories(

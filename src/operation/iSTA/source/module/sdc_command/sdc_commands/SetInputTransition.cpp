@@ -22,6 +22,10 @@ namespace ista::sdc {
 
 TclSetInputTransition::TclSetInputTransition(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
 {
+  addOption(new ecc::TclSwitchOption("-rise"));
+  addOption(new ecc::TclSwitchOption("-fall"));
+  addOption(new ecc::TclSwitchOption("-min"));
+  addOption(new ecc::TclSwitchOption("-max"));
   addOption(new ecc::TclDoubleOption("transition", 1));
   addOption(new ecc::TclStringListOption("objects", 1));
 }
@@ -38,10 +42,27 @@ unsigned TclSetInputTransition::exec()
   }
 
   const double transition_value = transition_option->getDoubleVal();
+  if (!std::isfinite(transition_value) || transition_value < 0.0) {
+    setTclError("set_input_transition must be finite and non-negative");
+    return 0;
+  }
+  const bool rise = getOptionOrArg("-rise")->is_set_val();
+  const bool fall = getOptionOrArg("-fall")->is_set_val();
+  const bool min = getOptionOrArg("-min")->is_set_val();
+  const bool max = getOptionOrArg("-max")->is_set_val();
   for (const std::string& port_name : resolveObjectList(data_manager.getDatabase(), object_option->getStringList())) {
     TimingPortConstraint& port_constraint = getPortConstraint(data_manager.getDatabase(), port_name);
-    port_constraint.set_input_transition(transition_value);
-    port_constraint.set_has_input_transition(true);
+    for (AnalysisType analysis_type : {AnalysisType::kMin, AnalysisType::kMax}) {
+      if ((analysis_type == AnalysisType::kMin && max && !min) || (analysis_type == AnalysisType::kMax && min && !max)) {
+        continue;
+      }
+      if (!fall || rise) {
+        port_constraint.set_input_transition(analysis_type, TransType::kRise, transition_value);
+      }
+      if (!rise || fall) {
+        port_constraint.set_input_transition(analysis_type, TransType::kFall, transition_value);
+      }
+    }
   }
   return 1;
 }

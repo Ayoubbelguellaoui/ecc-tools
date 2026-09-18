@@ -15,42 +15,29 @@
 // See the Mulan PSL v2 for more details.
 // ***************************************************************************************
 #include "DataManager.hpp"
-#include "Logger.hpp"
+#include "SdcCommandUtils.hpp"
 #include "SdcCommands.hpp"
 
 namespace ista::sdc {
 
 TclGetPorts::TclGetPorts(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
 {
-  addOption(new ecc::TclStringListOption("ports", 1));
+  addOption(new ecc::TclStringOption("ports", 1));
+  addOption(new ecc::TclSwitchOption("-quiet"));
+  addOption(new ecc::TclSwitchOption("-regexp"));
 }
 
 unsigned TclGetPorts::exec()
 {
-  ecc::TclOption* port_option = getOptionOrArg("ports");
-  if (!port_option->is_set_val()) {
-    setTclError("get_ports requires a port list");
+  ecc::TclOption* objects = getOptionOrArg("ports");
+  const bool regexp = getOptionOrArg("-regexp")->is_set_val();
+  const std::string patterns = objects->is_set_val() ? objects->getStringVal() : "*";
+  std::vector<std::string> result = queryObjects(STADM.getDatabase(), queryPatterns(patterns, regexp), QueryObjectType::kPort, regexp);
+  if (result.empty() && !getOptionOrArg("-quiet")->is_set_val()) {
+    setTclError("no ports matched: " + patterns);
     return 0;
   }
-  const std::vector<std::string> port_name_list = port_option->getStringList();
-  if (port_name_list.empty()) {
-    setTclError("get_ports requires at least one port name");
-    return 0;
-  }
-
-  Database& database = STADM.getDatabase();
-  std::vector<std::string> resolved_ports;
-  resolved_ports.reserve(port_name_list.size());
-  for (const std::string& port_name : port_name_list) {
-    const auto pin_it = database.get_pin_map().find(port_name);
-    if (pin_it == database.get_pin_map().end() || !pin_it->second.get_is_port()) {
-      STALOG.warn(Loc::current(), "port '", port_name, "' does not exist");
-      setTclError("port does not exist");
-      return 0;
-    }
-    resolved_ports.push_back(port_name);
-  }
-  setResult(std::move(resolved_ports));
+  setResult(std::move(result));
   return 1;
 }
 

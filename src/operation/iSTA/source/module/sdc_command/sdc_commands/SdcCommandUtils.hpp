@@ -20,6 +20,20 @@
 #include "STAHeader.hpp"
 namespace ista::sdc {
 
+enum class QueryObjectType
+{
+  kPort,
+  kPin,
+  kCell,
+  kNet,
+  kClock,
+  kAny
+};
+std::vector<std::string> queryPatterns(const std::string& text, bool regexp);
+std::vector<std::string> queryObjects(Database& database, const std::vector<std::string>& patterns, QueryObjectType type, bool regexp = false);
+std::set<std::string> resolveClockObjects(Database& database, const std::vector<std::string>& objects);
+std::set<std::string> resolveExceptionObjects(Database& database, const std::vector<std::string>& objects);
+
 std::vector<std::string> resolveObjectList(Database& database, const std::vector<std::string>& object_list);
 TimingPortConstraint& getPortConstraint(Database& database, const std::string& port_name);
 

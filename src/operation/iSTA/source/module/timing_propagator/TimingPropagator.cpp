@@ -20,6 +20,7 @@
 #include "DelayCalculator.hpp"
 #include "Logger.hpp"
 #include "Monitor.hpp"
+#include "Utility.hpp"
 
 namespace ista {
 
@@ -341,13 +342,14 @@ double TimingPropagator::getStartPointArrival(std::string& start_point, Analysis
   Pin& pin = database.get_pin_map()[start_point];
   if (pin.get_is_port()) {
     std::map<std::string, TimingPortConstraint>& port_constraint_map = database.get_timing_constraint().get_port_constraint_map();
+    double arrival = 0.0;
     if (analysis_type == AnalysisType::kMin && port_constraint_map.count(start_point) > 0 && port_constraint_map[start_point].get_has_input_delay_min()) {
-      return port_constraint_map[start_point].get_input_delay_min();
+      arrival = STAUTIL.getLaunchClockEdge(database, start_point, getClockName(start_point)) + port_constraint_map[start_point].get_input_delay_min();
+    } else if (port_constraint_map.count(start_point) > 0 && port_constraint_map[start_point].get_has_input_delay_max()) {
+      arrival = STAUTIL.getLaunchClockEdge(database, start_point, getClockName(start_point)) + port_constraint_map[start_point].get_input_delay_max();
     }
-    if (port_constraint_map.count(start_point) > 0 && port_constraint_map[start_point].get_has_input_delay_max()) {
-      return port_constraint_map[start_point].get_input_delay_max();
-    }
-    return 0.0;
+    std::optional<DCTimingResult> driving_cell_timing = getDrivingCellTiming(start_point, analysis_type, trans_type);
+    return driving_cell_timing ? arrival + driving_cell_timing->get_delay() : arrival;
   }
   if (database.get_instance_map().count(pin.get_instance_name()) == 0) {
     return 0.0;
@@ -355,7 +357,8 @@ double TimingPropagator::getStartPointArrival(std::string& start_point, Analysis
   Instance& instance = database.get_instance_map()[pin.get_instance_name()];
   if (instance.get_is_sequential() && start_point == instance.get_clock_pin_name()) {
     TransType clock_trans_type = getClockTransType(instance.get_clock_to_q_arc());
-    return getClockArrival(instance.get_clock_pin_name(), analysis_type, clock_trans_type);
+    return STAUTIL.getLaunchClockEdge(database, start_point, getClockName(start_point))
+           + getClockArrival(instance.get_clock_pin_name(), analysis_type, clock_trans_type);
   }
   if (instance.get_is_sequential() && start_point == instance.get_output_pin_name()) {
     TransType clock_trans_type = getClockTransType(instance.get_clock_to_q_arc());
@@ -370,7 +373,8 @@ double TimingPropagator::getStartPointArrival(std::string& start_point, Analysis
     dc_task.set_input_slew(clock_slew);
     STADC.calculate(dc_task);
     if (dc_task.get_is_valid()) {
-      return getClockArrival(instance.get_clock_pin_name(), analysis_type, clock_trans_type) + dc_task.get_timing_result().get_delay();
+      return STAUTIL.getLaunchClockEdge(database, start_point, getClockName(start_point))
+             + getClockArrival(instance.get_clock_pin_name(), analysis_type, clock_trans_type) + dc_task.get_timing_result().get_delay();
     }
   }
   return 0.0;
@@ -414,8 +418,16 @@ double TimingPropagator::getStartPointSlew(std::string& start_point, AnalysisTyp
   Pin& pin = database.get_pin_map()[start_point];
   if (pin.get_is_port()) {
     std::map<std::string, TimingPortConstraint>& port_constraint_map = database.get_timing_constraint().get_port_constraint_map();
-    if (port_constraint_map.count(start_point) > 0 && port_constraint_map[start_point].get_has_input_transition()) {
-      return port_constraint_map[start_point].get_input_transition();
+    if (port_constraint_map.count(start_point) == 0) {
+      return 0.0;
+    }
+    TimingPortConstraint& port_constraint = port_constraint_map[start_point];
+    if (port_constraint.get_has_driving_cell(analysis_type, trans_type)) {
+      std::optional<DCTimingResult> driving_cell_timing = getDrivingCellTiming(start_point, analysis_type, trans_type);
+      return driving_cell_timing ? driving_cell_timing->get_slew() : 0.0;
+    }
+    if (port_constraint.get_has_input_transition(analysis_type, trans_type)) {
+      return port_constraint.get_input_transition(analysis_type, trans_type);
     }
     return 0.0;
   }
@@ -446,6 +458,38 @@ double TimingPropagator::getStartPointSlew(std::string& start_point, AnalysisTyp
   return 0.0;
 }
 
+std::optional<DCTimingResult> TimingPropagator::getDrivingCellTiming(std::string& start_point, AnalysisType analysis_type, TransType trans_type)
+{
+  Database& database = STADM.getDatabase();
+  std::map<std::string, TimingPortConstraint>& port_constraint_map = database.get_timing_constraint().get_port_constraint_map();
+  if (!port_constraint_map.contains(start_point)) {
+    return std::nullopt;
+  }
+  TimingDrivingCell* driving_cell = port_constraint_map.at(start_point).get_driving_cell(analysis_type, trans_type);
+  if (driving_cell == nullptr) {
+    return std::nullopt;
+  }
+  std::map<std::string, TimingCell>& timing_cell_map = database.get_timing_library().get_cell_map();
+  if (!timing_cell_map.contains(driving_cell->get_cell_name())) {
+    return std::nullopt;
+  }
+  TimingCell& timing_cell = timing_cell_map.at(driving_cell->get_cell_name());
+  if (timing_cell.get_library_name() != driving_cell->get_library_name()) {
+    return std::nullopt;
+  }
+  for (TimingCellArc& timing_cell_arc : timing_cell.get_cell_arc_list()) {
+    if (timing_cell_arc.get_source_port() != driving_cell->get_from_pin() || timing_cell_arc.get_sink_port() != driving_cell->get_to_pin()) {
+      continue;
+    }
+    DCTimingResult timing_result;
+    if (STADC.calculateDrivingCell(start_point, timing_cell_arc, analysis_type, trans_type, driving_cell->get_input_transition_rise(),
+                                   driving_cell->get_input_transition_fall(), timing_result)) {
+      return timing_result;
+    }
+  }
+  return std::nullopt;
+}
+
 double TimingPropagator::getStartPointLaunchTime(std::string& start_point, AnalysisType analysis_type)
 {
   return getStartPointLaunchTime(start_point, analysis_type, TransType::kRise);
@@ -459,13 +503,14 @@ double TimingPropagator::getStartPointLaunchTime(std::string& start_point, Analy
   }
   Pin& pin = database.get_pin_map()[start_point];
   if (pin.get_is_port() || database.get_instance_map().count(pin.get_instance_name()) == 0) {
-    return 0.0;
+    return STAUTIL.getLaunchClockEdge(database, start_point, getClockName(start_point));
   }
   Instance& instance = database.get_instance_map()[pin.get_instance_name()];
   if (!instance.get_is_sequential() || (start_point != instance.get_output_pin_name() && start_point != instance.get_clock_pin_name())) {
     return 0.0;
   }
-  return getClockArrival(instance.get_clock_pin_name(), analysis_type, getClockTransType(instance.get_clock_to_q_arc()));
+  return STAUTIL.getLaunchClockEdge(database, start_point, getClockName(start_point))
+         + getClockArrival(instance.get_clock_pin_name(), analysis_type, getClockTransType(instance.get_clock_to_q_arc()));
 }
 
 std::string TimingPropagator::getStartPointCrprClockPin(std::string& start_point)
@@ -567,9 +612,14 @@ void TimingPropagator::seedPathState(std::string& start_point, AnalysisType anal
     return;
   }
   std::string path_state_start_point = getPathStateStartPoint(start_point);
-  std::string path_state_tag{getClockName(start_point)};
+  std::string clock_name{getClockName(start_point)};
   TimingPoint& timing_point = database.get_timing_point_map()[start_point];
   for (TransType trans_type : {TransType::kRise, TransType::kFall}) {
+    const std::vector<int32_t> initial_false_path_state_list
+        = STAUTIL.initFalsePathState(database, path_state_start_point, clock_name, trans_type, analysis_type);
+    const std::vector<int32_t> false_path_state_list
+        = STAUTIL.advanceFalsePathState(database, initial_false_path_state_list, start_point, trans_type);
+    const std::string path_state_tag = STAUTIL.getPathStateTag(database, path_state_start_point, clock_name, false_path_state_list);
     double arrival = getStartPointArrival(start_point, analysis_type, trans_type);
     std::map<std::string, TimingPathState>& path_state_map = getPathStateMap(timing_point, analysis_type, source_type, trans_type);
     if (path_state_map.count(path_state_tag) > 0 && !isBetterArrival(arrival, path_state_map[path_state_tag].get_arrival(), analysis_type)) {
@@ -581,8 +631,11 @@ void TimingPropagator::seedPathState(std::string& start_point, AnalysisType anal
     path_state.set_slew(getStartPointSlew(start_point, analysis_type, trans_type));
     path_state.set_launch_time(getStartPointLaunchTime(start_point, analysis_type, trans_type));
     path_state.set_start_point(path_state_start_point);
-    path_state.set_clock_name(path_state_tag);
+    path_state.set_clock_name(clock_name);
     path_state.set_crpr_clock_pin(getStartPointCrprClockPin(start_point));
+    path_state.set_path_state_tag(path_state_tag);
+    path_state.set_predecessor_path_state_tag("");
+    path_state.set_false_path_state_list(false_path_state_list);
     path_state.get_predecessor().clear();
     path_state.set_predecessor_arc_idx(std::numeric_limits<std::size_t>::max());
     path_state.set_predecessor_arc_delay(0.0);
@@ -710,7 +763,10 @@ void TimingPropagator::propagatePathStateArc(std::size_t arc_idx, AnalysisType a
     }
     double arc_delay = getArcDelay(arc, analysis_type, input_trans_type, output_trans_type);
     double candidate_arrival = roundTime(source_path_state.get_arrival() + arc_delay);
-    const std::string& path_state_tag = source_path_state.get_clock_name();
+    const std::vector<int32_t> false_path_state_list
+        = STAUTIL.advanceFalsePathState(database, source_path_state.get_false_path_state_list(), arc.get_sink_pin(), output_trans_type);
+    const std::string path_state_tag
+        = STAUTIL.getPathStateTag(database, source_path_state.get_start_point(), source_path_state.get_clock_name(), false_path_state_list);
     std::map<std::string, TimingPathState>& sink_path_state_map = getPathStateMap(sink_point, analysis_type, source_type, output_trans_type);
     if (sink_path_state_map.count(path_state_tag) == 0
         || isBetterArrival(candidate_arrival, sink_path_state_map[path_state_tag].get_arrival(), analysis_type)) {
@@ -724,6 +780,9 @@ void TimingPropagator::propagatePathStateArc(std::size_t arc_idx, AnalysisType a
       sink_path_state.set_launch_time(source_path_state.get_launch_time());
       sink_path_state.set_clock_name(source_path_state.get_clock_name());
       sink_path_state.set_crpr_clock_pin(source_path_state.get_crpr_clock_pin());
+      sink_path_state.set_path_state_tag(path_state_tag);
+      sink_path_state.set_predecessor_path_state_tag(source_path_state_pair.first);
+      sink_path_state.set_false_path_state_list(false_path_state_list);
       sink_path_state.set_trans_type(output_trans_type);
       sink_path_state.set_predecessor_trans_type(input_trans_type);
       sink_path_state.set_crpr_clock_trans_type(source_path_state.get_crpr_clock_trans_type());

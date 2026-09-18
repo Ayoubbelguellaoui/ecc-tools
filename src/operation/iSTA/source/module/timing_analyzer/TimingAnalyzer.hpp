@@ -42,6 +42,8 @@ class TimingAnalyzer
   TimingAnalyzer& operator=(const TimingAnalyzer& other) = delete;
   TimingAnalyzer& operator=(TimingAnalyzer&& other) = delete;
   // function
+  void analyzeFanoutConstraints();
+  TimingCellPort* getFanoutCellPort(Pin& pin);
   TAModel initTAModel();
   bool isDisableArc(Arc& arc);
   bool shouldStopDataPropagation(Arc& arc);
@@ -59,7 +61,7 @@ class TimingAnalyzer
   std::map<std::string, TimingPathState>& getPathStateMap(TimingPoint& timing_point, AnalysisType analysis_type, PathSourceType source_type,
                                                           TransType trans_type);
   TimingPathState& getPathState(TimingPoint& timing_point, AnalysisType analysis_type, PathSourceType source_type, TransType trans_type,
-                                std::string& start_point);
+                                const std::string& path_state_tag);
   TimingPathState* getWorstPathState(TimingPoint& timing_point, AnalysisType analysis_type, PathSourceType source_type);
   TimingPathState* getWorstPathState(TimingPoint& timing_point, AnalysisType analysis_type, PathSourceType source_type, TransType trans_type);
   TransType getEndPointTransType(TimingPoint& timing_point, AnalysisType analysis_type, PathSourceType source_type);
@@ -84,6 +86,7 @@ class TimingAnalyzer
   AnalysisType getCaptureAnalysisType(AnalysisType analysis_type);
   TransType getClockTransType(TimingCheckArc& timing_check_arc);
   double getEndPointCaptureTime(std::string& end_point, AnalysisType analysis_type);
+  double getEndPointCaptureTime(std::string& start_point, std::string& end_point, AnalysisType analysis_type);
   double getEndPointClockArrival(std::string& end_point, AnalysisType analysis_type);
   double getEndPointClockArrival(std::string& end_point, AnalysisType analysis_type, TransType trans_type);
   double getClockReconvergencePessimism(TimingPathState& end_path_state, std::string& end_point, AnalysisType analysis_type, std::string& common_pin_name);
@@ -124,9 +127,9 @@ class TimingAnalyzer
                                std::vector<TransType>& path_trans_type_list, std::vector<std::size_t>& path_arc_idx_list, std::size_t sink_idx,
                                std::size_t diversion_arc_idx, TransType input_trans_type, TimingPathState& source_path_state);
   bool isOutputTransType(Arc& arc, AnalysisType analysis_type, TransType input_trans_type, TransType output_trans_type);
-  bool updateDiversionPathState(std::string& pin_name, AnalysisType analysis_type, PathSourceType source_type, TransType trans_type,
-                                TimingPathState& source_path_state, std::string& predecessor, std::size_t predecessor_arc_idx, double predecessor_arc_delay,
-                                TransType predecessor_trans_type, double arrival);
+  TimingPathState* updateDiversionPathState(std::string& pin_name, AnalysisType analysis_type, PathSourceType source_type, TransType trans_type,
+                                            TimingPathState& source_path_state, std::string& predecessor, std::size_t predecessor_arc_idx,
+                                            double predecessor_arc_delay, TransType predecessor_trans_type, double arrival);
   double getDataSlew(TimingPoint& timing_point, AnalysisType analysis_type, TransType trans_type);
   TimingPathState* getWorstSlackPathState(std::string& end_point, AnalysisType analysis_type, PathSourceType source_type);
   double calcPathRequiredTime(std::string& end_point, TimingPathState& end_path_state, AnalysisType analysis_type);
@@ -136,15 +139,16 @@ class TimingAnalyzer
   bool hasOutputDelay(std::string& end_point);
   bool isRegisterEndPoint(std::string& end_point);
   bool isTimingCheckEndPoint(std::string& end_point);
-  TimingPath buildTimingPath(std::string& end_point, AnalysisType analysis_type, PathSourceType source_type, TransType trans_type, std::string& start_point);
-  void buildPathTrace(std::string& end_point, AnalysisType analysis_type, PathSourceType source_type, TransType trans_type, std::string& start_point,
-                      std::vector<std::string>& path_pin_name_list, std::vector<TransType>& path_trans_type_list);
+  TimingPath buildTimingPath(std::string& end_point, AnalysisType analysis_type, PathSourceType source_type, TimingPathState& end_path_state);
+  void buildPathTrace(std::string& end_point, AnalysisType analysis_type, PathSourceType source_type, TimingPathState& end_path_state,
+                      std::vector<std::string>& path_pin_name_list, std::vector<TransType>& path_trans_type_list,
+                      std::vector<std::string>& path_state_tag_list);
   std::vector<std::size_t> getPathArcIdxList(std::vector<std::string>& path_pin_name_list, std::vector<TransType>& path_trans_type_list,
-                                             AnalysisType analysis_type, PathSourceType source_type, std::string& start_point);
+                                             std::vector<std::string>& path_state_tag_list, AnalysisType analysis_type, PathSourceType source_type);
   void updatePathDelay(TimingPath& timing_path, Arc* arc, double arc_delay);
-  void updateClockInfo(TimingPath& timing_path, AnalysisType analysis_type, PathSourceType source_type, TransType trans_type, std::string& start_point);
+  void updateClockInfo(TimingPath& timing_path, AnalysisType analysis_type, TimingPathState& end_path_state);
   TimingPathPoint makeTimingPathPoint(std::string& pin_name, Arc* arc, AnalysisType analysis_type, PathSourceType source_type, TransType input_trans_type,
-                                      TransType trans_type, std::string& start_point);
+                                      TransType trans_type, const std::string& path_state_tag);
   void insertTimingPath(TimingPathGroup& timing_path_group, TimingPath& timing_path);
   TimingPathEnd initTimingPathEnd(std::string& end_point);
   void updateWorstSlack(TAModel& ta_model, TimingPath& timing_path);

@@ -30,9 +30,11 @@ class SdcTclCmd : public ecc::TclCmd
   int execute(Tcl_Interp* interp, int objc, Tcl_Obj* const objv[]);
 
  protected:
+  void setOptionValue(ecc::TclOption* option, const char* value);
   void setTclError(std::string error_message) { _error_message = std::move(error_message); }
   void setResult(std::string result);
   void setResult(std::vector<std::string> result);
+  const std::vector<std::pair<std::string, std::string>>& getOptionValueList() const { return _option_value_list; }
 
   ClientData getClientData() const { return _client_data; }
 
@@ -44,6 +46,7 @@ class SdcTclCmd : public ecc::TclCmd
   std::string _error_message;
   std::string _result;
   std::vector<std::string> _list_result;
+  std::vector<std::pair<std::string, std::string>> _option_value_list;
   bool _has_result = false;
   bool _has_list_result = false;
 };
@@ -56,8 +59,13 @@ int executeTclCommand(ClientData client_data, Tcl_Interp* interp, int objc, Tcl_
     return TCL_ERROR;
   }
 
-  Command command(Tcl_GetString(objv[0]), client_data);
-  return command.execute(interp, objc, objv);
+  try {
+    Command command(Tcl_GetString(objv[0]), client_data);
+    return command.execute(interp, objc, objv);
+  } catch (const std::exception& error) {
+    Tcl_SetObjResult(interp, Tcl_NewStringObj(error.what(), -1));
+    return TCL_ERROR;
+  }
 }
 
 }  // namespace ista::sdc
