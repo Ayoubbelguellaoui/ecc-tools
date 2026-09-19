@@ -1022,7 +1022,6 @@ int32_t DefRead::componentEndCallback(defrCallbackType_e type, void*, defiUserDa
     return kDbFail;
   }
 
-  ECCLOG.info(ecc::Loc::current(), "");
   def_reader->set_end_time(clock());
 
   return kDbSuccess;
@@ -1281,7 +1280,6 @@ int32_t DefRead::netEndCallback(defrCallbackType_e type, void*, defiUserData dat
     return kDbFail;
   }
 
-  ECCLOG.info(ecc::Loc::current(), "");
 
   return kDbSuccess;
 }
@@ -1579,7 +1577,6 @@ int32_t DefRead::specialNetEndCallback(defrCallbackType_e type, void*, defiUserD
     return kDbFail;
   }
 
-  ECCLOG.info(ecc::Loc::current(), "");
 
   ECCLOG.info(ecc::Loc::current(), "End parse Specialnet.");
 
