@@ -259,7 +259,10 @@ void IOPlacer::placeIOPinsFromFile(const std::string& file_path)
     Core& core = database.get_core();
     int32_t range_low = vertical_edge ? core.get_ll_y() : core.get_ll_x();
     int32_t range_high = vertical_edge ? core.get_ur_y() : core.get_ur_x();
-    if (2LL * along_coord - width < 2LL * range_low || 2LL * along_coord + width > 2LL * range_high) {
+    int32_t lower_half_width = width / 2;
+    int32_t upper_half_width = width - lower_half_width;
+    if (static_cast<int64_t>(along_coord) - lower_half_width < range_low
+        || static_cast<int64_t>(along_coord) + upper_half_width > range_high) {
       FPLOG.error(Loc::current(), "IO pin '", pin_name, "' is outside the legal core-edge range at line ", line_num, "!");
     }
 
@@ -279,10 +282,10 @@ void IOPlacer::placeIOPinsFromFile(const std::string& file_path)
       if (first.edge_type != second.edge_type || first.layer_name != second.layer_name) {
         continue;
       }
-      int64_t first_low = 2LL * first.along_coord - first.width;
-      int64_t first_high = 2LL * first.along_coord + first.width;
-      int64_t second_low = 2LL * second.along_coord - second.width;
-      int64_t second_high = 2LL * second.along_coord + second.width;
+      int64_t first_low = static_cast<int64_t>(first.along_coord) - first.width / 2;
+      int64_t first_high = first_low + first.width;
+      int64_t second_low = static_cast<int64_t>(second.along_coord) - second.width / 2;
+      int64_t second_high = second_low + second.width;
       if (std::max(first_low, second_low) < std::min(first_high, second_high)) {
         FPLOG.error(Loc::current(), "Overlapping IO pin shapes at lines ", first.line_num, " and ", second.line_num, " in '", file_path, "'!");
       }
@@ -355,8 +358,10 @@ void IOPlacer::autoPlacePins(std::vector<std::string>& layer_name_list)
                               int32_t perpendicular_span) {
       int32_t legal_low = std::max(range_low, die_low + access_pitch);
       int32_t legal_high = std::min(range_high, die_high - access_pitch);
-      int32_t start = track_offset + FPUTIL.alignUp(legal_low + pin_span / 2 - track_offset, track_pitch);
-      int32_t end = track_offset + FPUTIL.alignDown(legal_high - pin_span / 2 - track_offset, track_pitch);
+      int32_t lower_half_span = pin_span / 2;
+      int32_t upper_half_span = pin_span - lower_half_span;
+      int32_t start = track_offset + FPUTIL.alignUp(legal_low + lower_half_span - track_offset, track_pitch);
+      int32_t end = track_offset + FPUTIL.alignDown(legal_high - upper_half_span - track_offset, track_pitch);
       if (start > end) {
         return;
       }
@@ -541,12 +546,14 @@ int32_t IOPlacer::getAlongCoord(int32_t range_low, int32_t range_high, int32_t d
   int32_t legal_high = std::min(range_high, die_high - access_pitch);
   auto align_up = [track_offset, track_pitch](int32_t value) { return track_offset + FPUTIL.alignUp(value - track_offset, track_pitch); };
   auto align_down = [track_offset, track_pitch](int32_t value) { return track_offset + FPUTIL.alignDown(value - track_offset, track_pitch); };
-  int32_t start = align_up(legal_low + pin_span / 2);
-  int32_t end = align_down(legal_high - pin_span / 2);
+  int32_t lower_half_span = pin_span / 2;
+  int32_t upper_half_span = pin_span - lower_half_span;
+  int32_t start = align_up(legal_low + lower_half_span);
+  int32_t end = align_down(legal_high - upper_half_span);
 
   if (start > end) {
-    start = align_up(range_low + pin_span / 2);
-    end = align_down(range_high - pin_span / 2);
+    start = align_up(range_low + lower_half_span);
+    end = align_down(range_high - upper_half_span);
   }
   if (start > end) {
     return track_offset + FPUTIL.alignNearest((range_low + range_high) / 2 - track_offset, track_pitch);
@@ -570,10 +577,12 @@ void IOPlacer::addIOPinPort(IOPin& io_pin, IOEdgeType edge_type, int32_t x, int3
   syncPinLocation(io_pin, io_port, x, y);
 
   Die& die = FPDM.getDatabase().get_die();
-  int32_t shape_ll_x = x - width / 2;
-  int32_t shape_ll_y = y - width / 2;
-  int32_t shape_ur_x = x + width / 2;
-  int32_t shape_ur_y = y + width / 2;
+  int32_t lower_half_width = width / 2;
+  int32_t upper_half_width = width - lower_half_width;
+  int32_t shape_ll_x = x - lower_half_width;
+  int32_t shape_ll_y = y - lower_half_width;
+  int32_t shape_ur_x = x + upper_half_width;
+  int32_t shape_ur_y = y + upper_half_width;
   if (edge_type == IOEdgeType::kLeft) {
     shape_ll_x = die.get_ll_x();
     shape_ur_x = die.get_ll_x() + depth;
