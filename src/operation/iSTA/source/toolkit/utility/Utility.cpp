@@ -45,20 +45,56 @@ void Utility::destroyInst()
   }
 }
 
-// Keep candidates with different false-path applicability in separate arrival tags.
-// A false worst path must not hide a slower/faster valid path from the same clock.
-std::string Utility::getPathStateTag(Database& database, std::string_view start, std::string_view clock)
+std::vector<int32_t> Utility::initFalsePathState(Database& database, std::string_view start, std::string_view clock, TransType start_trans_type,
+                                                 AnalysisType analysis_type)
+{
+  std::vector<int32_t> state_list;
+  for (const TimingException& exception : database.get_timing_constraint().get_false_path_list()) {
+    bool applies = (analysis_type == AnalysisType::kMax && exception.get_setup()) || (analysis_type == AnalysisType::kMin && exception.get_hold());
+    applies = applies && matchesTimingObjects(database, exception.get_from_objects(), start, clock, true);
+    if (applies && exception.get_from_trans_type() != TransType::kNone) {
+      const bool clock_selector = !clock.empty() && exception.get_from_objects().contains(std::string(clock));
+      const TransType actual_trans_type = clock_selector ? getLaunchClockTransition(database, start) : start_trans_type;
+      applies = actual_trans_type == exception.get_from_trans_type();
+    }
+    state_list.push_back(applies ? 0 : -1);
+  }
+  return state_list;
+}
+
+std::vector<int32_t> Utility::advanceFalsePathState(Database& database, const std::vector<int32_t>& state_list, std::string_view pin_name,
+                                                    TransType trans_type)
+{
+  std::vector<int32_t> next_state_list = state_list;
+  const std::vector<TimingException>& false_paths = database.get_timing_constraint().get_false_path_list();
+  for (std::size_t exception_index = 0; exception_index < false_paths.size() && exception_index < next_state_list.size(); ++exception_index) {
+    int32_t& state = next_state_list[exception_index];
+    if (state < 0) {
+      continue;
+    }
+    const std::vector<TimingExceptionThrough>& through_list = false_paths[exception_index].get_through_list();
+    while (static_cast<std::size_t>(state) < through_list.size()) {
+      const TimingExceptionThrough& through = through_list[state];
+      if (!matchesThroughObjects(database, through.get_objects(), pin_name)
+          || (through.get_trans_type() != TransType::kNone && through.get_trans_type() != trans_type)) {
+        break;
+      }
+      ++state;
+    }
+  }
+  return next_state_list;
+}
+
+// Keep candidates with different exception progress in separate arrival tags.
+std::string Utility::getPathStateTag(Database& database, std::string_view start, std::string_view clock,
+                                     const std::vector<int32_t>& false_path_state_list)
 {
   std::string tag(clock);
   if (getLaunchClockTransition(database, start) == TransType::kFall) {
     tag += "\x1e";
   }
-  std::size_t index = 0;
-  for (const TimingException& exception : database.get_timing_constraint().get_false_path_list()) {
-    if (!exception.get_from_objects().empty() && matchesTimingObjects(database, exception.get_from_objects(), start, clock, true)) {
-      tag += "\x1f" + std::to_string(index);
-    }
-    ++index;
+  for (const int32_t state : false_path_state_list) {
+    tag += "\x1f" + std::to_string(state);
   }
   return tag;
 }
@@ -116,7 +152,8 @@ double Utility::getClockEdgeSeparation(double launch_period, double capture_peri
 }
 
 bool Utility::isFalsePath(Database& database, std::string_view start, std::string_view launch_clock, std::string_view end, std::string_view capture_clock,
-                          AnalysisType type)
+                          AnalysisType analysis_type, TransType end_trans_type, TransType capture_clock_trans_type,
+                          const std::vector<int32_t>& false_path_state_list)
 {
   for (const TimingClockGroup& relation : database.get_timing_constraint().get_clock_group_list()) {
     if (relation.get_allow_paths() || launch_clock.empty() || capture_clock.empty()) {
@@ -137,15 +174,41 @@ bool Utility::isFalsePath(Database& database, std::string_view start, std::strin
       return true;
     }
   }
-  for (const TimingException& exception : database.get_timing_constraint().get_false_path_list()) {
-    if ((type == AnalysisType::kMax && exception.get_setup()) || (type == AnalysisType::kMin && exception.get_hold())) {
-      if (matchesTimingObjects(database, exception.get_from_objects(), start, launch_clock, true)
-          && matchesTimingObjects(database, exception.get_to_objects(), end, capture_clock, false)) {
-        return true;
+  const std::vector<TimingException>& false_paths = database.get_timing_constraint().get_false_path_list();
+  for (std::size_t exception_index = 0; exception_index < false_paths.size() && exception_index < false_path_state_list.size(); ++exception_index) {
+    const TimingException& exception = false_paths[exception_index];
+    const bool analysis_matches
+        = (analysis_type == AnalysisType::kMax && exception.get_setup()) || (analysis_type == AnalysisType::kMin && exception.get_hold());
+    const bool transition_matches
+        = (end_trans_type == TransType::kRise && exception.get_rise()) || (end_trans_type == TransType::kFall && exception.get_fall());
+    if (!analysis_matches || !transition_matches || false_path_state_list[exception_index] < 0
+        || static_cast<std::size_t>(false_path_state_list[exception_index]) != exception.get_through_list().size()
+        || !matchesTimingObjects(database, exception.get_to_objects(), end, capture_clock, false)) {
+      continue;
+    }
+    if (exception.get_to_trans_type() != TransType::kNone) {
+      const bool clock_selector = !capture_clock.empty() && exception.get_to_objects().contains(std::string(capture_clock));
+      const TransType actual_trans_type = clock_selector ? capture_clock_trans_type : end_trans_type;
+      if (actual_trans_type != exception.get_to_trans_type()) {
+        continue;
       }
     }
+    return true;
   }
   return false;
+}
+
+bool Utility::matchesThroughObjects(Database& database, const std::set<std::string>& objects, std::string_view pin_name)
+{
+  if (objects.contains(std::string(pin_name))) {
+    return true;
+  }
+  const auto pin = database.get_pin_map().find(std::string(pin_name));
+  if (pin == database.get_pin_map().end()) {
+    return false;
+  }
+  return (!pin->second.get_instance_name().empty() && objects.contains(pin->second.get_instance_name()))
+         || (!pin->second.get_net_name().empty() && objects.contains(pin->second.get_net_name()));
 }
 
 bool Utility::matchesTimingObjects(Database& database, const std::set<std::string>& objects, std::string_view pin_name, std::string_view clock_name, bool start)

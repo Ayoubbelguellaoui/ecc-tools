@@ -20,30 +20,25 @@
 
 namespace ista::sdc {
 
-TclSetLoad::TclSetLoad(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
+TclGetNets::TclGetNets(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
 {
-  addOption(new ecc::TclSwitchOption("-pin_load"));
-  addOption(new ecc::TclDoubleOption("load", 1));
-  addOption(new ecc::TclStringListOption("objects", 1));
+  addOption(new ecc::TclStringOption("nets", 1));
+  addOption(new ecc::TclSwitchOption("-quiet"));
+  addOption(new ecc::TclSwitchOption("-regexp"));
+  addOption(new ecc::TclSwitchOption("-hierarchical"));
 }
 
-unsigned TclSetLoad::exec()
+unsigned TclGetNets::exec()
 {
-  auto& data_manager = DataManager::getInst();
-
-  ecc::TclOption* load_option = getOptionOrArg("load");
-  ecc::TclOption* object_option = getOptionOrArg("objects");
-  if (!load_option->is_set_val() || !object_option->is_set_val()) {
-    setTclError("set_load requires a load and an object collection");
+  ecc::TclOption* objects = getOptionOrArg("nets");
+  const bool regexp = getOptionOrArg("-regexp")->is_set_val();
+  const std::string patterns = objects->is_set_val() ? objects->getStringVal() : "*";
+  std::vector<std::string> result = queryObjects(STADM.getDatabase(), queryPatterns(patterns, regexp), QueryObjectType::kNet, regexp);
+  if (result.empty() && !getOptionOrArg("-quiet")->is_set_val()) {
+    setTclError("no nets matched: " + patterns);
     return 0;
   }
-
-  const double load_value = load_option->getDoubleVal();
-  for (const std::string& port_name : resolveObjectList(data_manager.getDatabase(), object_option->getStringList())) {
-    TimingPortConstraint& port_constraint = getPortConstraint(data_manager.getDatabase(), port_name);
-    port_constraint.set_load(load_value);
-    port_constraint.set_has_load(true);
-  }
+  setResult(std::move(result));
   return 1;
 }
 

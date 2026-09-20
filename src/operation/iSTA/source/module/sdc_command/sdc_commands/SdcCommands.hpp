@@ -60,6 +60,22 @@ class TclGetPins : public SdcTclCmd
   unsigned exec() override;
 };
 
+class TclGetCells : public SdcTclCmd
+{
+ public:
+  TclGetCells(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclGetNets : public SdcTclCmd
+{
+ public:
+  TclGetNets(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
 class TclAllInputs : public SdcTclCmd
 {
  public:
@@ -128,6 +144,14 @@ class TclSetInputTransition : public SdcTclCmd
 {
  public:
   TclSetInputTransition(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclSetDrivingCell : public SdcTclCmd
+{
+ public:
+  TclSetDrivingCell(const char* cmd_name, ClientData client_data);
   unsigned check() override { return 1; }
   unsigned exec() override;
 };

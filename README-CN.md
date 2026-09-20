@@ -186,7 +186,6 @@ organization={IEEE}
 | 子模块         | 来源                                                                                                  | 详细用途                                                          |
 | -------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
 | flute3         | [FastRoute](https://github.com/The-OpenROAD-Project-Attic/flute3)                                                | 借助flute3来产生rectange steiner tree.                            |
-| abseil-cpp     | [Google abseil](https://github.com/abseil/abseil-cpp.git)                                                | 使用Google的高性能C++容器和算法库提升性能，相比STL会改进程序性能. |
 | json           | [JSON for Modern C++](https://github.com/nlohmann/json)                                                  | Json C++库，用来解析程序Json配置文件.                             |
 | libfort        | [Seleznev Anton libfort](https://github.com/seleznevae/libfort.git)                                      | C/C++ library 产生格式化的 ASCII tables.                          |
 | pegtl          | [PEGTL（Parsing Expression Grammar Template Library）](https://github.com/taocpp/PEGTL/)                 | 使用PEGTL来方便的解析SPEF文件.                                    |

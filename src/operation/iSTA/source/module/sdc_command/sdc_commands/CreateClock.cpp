@@ -35,8 +35,8 @@ unsigned TclCreateClock::exec()
   ecc::TclOption* period_option = getOptionOrArg("-period");
   ecc::TclOption* waveform_option = getOptionOrArg("-waveform");
   ecc::TclOption* object_option = getOptionOrArg("objects");
-  if (!name_option->is_set_val() || !period_option->is_set_val() || !object_option->is_set_val()) {
-    setTclError("create_clock requires -name, -period, and a port collection");
+  if (!name_option->is_set_val() || !period_option->is_set_val()) {
+    setTclError("create_clock requires -name and -period");
     return 0;
   }
   if (std::string(name_option->getStringVal()).empty()) {
@@ -67,10 +67,6 @@ unsigned TclCreateClock::exec()
   }
 
   const std::vector<std::string> source_list = object_option->getStringList();
-  if (source_list.empty()) {
-    setTclError("create_clock requires at least one source port");
-    return 0;
-  }
 
   Database& database = STADM.getDatabase();
   auto& clock_map = database.get_timing_constraint().get_clock_map();
