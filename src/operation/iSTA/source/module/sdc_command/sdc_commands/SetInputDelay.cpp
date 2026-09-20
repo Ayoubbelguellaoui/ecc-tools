@@ -23,12 +23,54 @@ namespace ista::sdc {
 TclSetInputDelay::TclSetInputDelay(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
 {
   addOption(new ecc::TclStringOption("-clock", 0));
+  addOption(new ecc::TclStringOption("-reference_pin", 0));
+  addOption(new ecc::TclSwitchOption("-rise"));
+  addOption(new ecc::TclSwitchOption("-fall"));
+  addOption(new ecc::TclSwitchOption("-clock_fall"));
   addOption(new ecc::TclSwitchOption("-min"));
   addOption(new ecc::TclSwitchOption("-max"));
   addOption(new ecc::TclSwitchOption("-add_delay"));
+  addOption(new ecc::TclSwitchOption("-level_sensitive"));
+  addOption(new ecc::TclSwitchOption("-network_latency_included"));
+  addOption(new ecc::TclSwitchOption("-source_latency_included"));
   addOption(new ecc::TclDoubleOption("delay", 1));
   addOption(new ecc::TclStringListOption("objects", 1));
 }
+
+namespace {
+
+std::vector<AnalysisType> selectedAnalysisTypes(bool set_min, bool set_max)
+{
+  if (set_min && !set_max) {
+    return {AnalysisType::kMin};
+  }
+  if (set_max && !set_min) {
+    return {AnalysisType::kMax};
+  }
+  return {AnalysisType::kMin, AnalysisType::kMax};
+}
+
+std::vector<TransType> selectedTransTypes(bool rise, bool fall)
+{
+  if (rise && !fall) {
+    return {TransType::kRise};
+  }
+  if (fall && !rise) {
+    return {TransType::kFall};
+  }
+  return {TransType::kRise, TransType::kFall};
+}
+
+std::vector<std::string> selectedClocks(Database& database, ecc::TclOption* clock_option)
+{
+  if (clock_option == nullptr || !clock_option->is_set_val()) {
+    return {""};
+  }
+  const std::set<std::string> clocks = resolveClockObjects(database, queryPatterns(clock_option->getStringVal(), false));
+  return {clocks.begin(), clocks.end()};
+}
+
+}  // namespace
 
 unsigned TclSetInputDelay::exec()
 {
@@ -45,22 +87,44 @@ unsigned TclSetInputDelay::exec()
   const double delay_value = delay_option->getDoubleVal();
   const bool set_min = getOptionOrArg("-min")->is_set_val();
   const bool set_max = getOptionOrArg("-max")->is_set_val();
-  const std::string clock_name = clock_option->is_set_val() ? clock_option->getStringVal() : std::string{};
-  for (const std::string& port_name : resolveObjectList(data_manager.getDatabase(), object_option->getStringList())) {
-    TimingPortConstraint& port_constraint = getPortConstraint(data_manager.getDatabase(), port_name);
-    port_constraint.set_clock_name(clock_name);
-    if (set_min && !set_max) {
-      port_constraint.set_input_delay_min(delay_value);
-      port_constraint.set_has_input_delay_min(true);
-    } else if (set_max && !set_min) {
-      port_constraint.set_input_delay_max(delay_value);
-      port_constraint.set_has_input_delay_max(true);
-    } else {
-      port_constraint.set_input_delay_min(delay_value);
-      port_constraint.set_input_delay_max(delay_value);
-      port_constraint.set_has_input_delay_min(true);
-      port_constraint.set_has_input_delay_max(true);
+  const bool rise = getOptionOrArg("-rise")->is_set_val();
+  const bool fall = getOptionOrArg("-fall")->is_set_val();
+  Database& database = data_manager.getDatabase();
+  const std::vector<std::string> clocks = selectedClocks(database, clock_option);
+  const std::vector<std::string> ports = resolveObjectList(database, object_option->getStringList());
+  if (ports.empty()) {
+    setTclError("set_input_delay requires at least one input port");
+    return 0;
+  }
+  for (const std::string& port_name : ports) {
+    Pin& pin = database.get_pin_map().at(port_name);
+    if (!pin.get_is_port() || (pin.get_direction() != PinDirection::kInput && pin.get_direction() != PinDirection::kInout)) {
+      setTclError("set_input_delay requires input ports; '" + port_name + "' is not an input port");
+      return 0;
     }
+  }
+  std::vector<TimingIoDelay> delays;
+  for (const std::string& clock_name : clocks) {
+    for (AnalysisType analysis_type : selectedAnalysisTypes(set_min, set_max)) {
+      for (TransType trans_type : selectedTransTypes(rise, fall)) {
+        TimingIoDelay delay;
+        delay.set_clock_name(clock_name);
+        delay.set_delay(delay_value);
+        delay.set_analysis_type(analysis_type);
+        delay.set_trans_type(trans_type);
+        delay.set_clock_trans_type(getOptionOrArg("-clock_fall")->is_set_val() ? TransType::kFall : TransType::kRise);
+        delay.set_level_sensitive(getOptionOrArg("-level_sensitive")->is_set_val());
+        delay.set_network_latency_included(getOptionOrArg("-network_latency_included")->is_set_val());
+        delay.set_source_latency_included(getOptionOrArg("-source_latency_included")->is_set_val());
+        if (getOptionOrArg("-reference_pin")->is_set_val()) {
+          delay.set_reference_pin(getOptionOrArg("-reference_pin")->getStringVal());
+        }
+        delays.push_back(std::move(delay));
+      }
+    }
+  }
+  for (const std::string& port_name : ports) {
+    getPortConstraint(database, port_name).set_input_delays(delays, getOptionOrArg("-add_delay")->is_set_val());
   }
   return 1;
 }

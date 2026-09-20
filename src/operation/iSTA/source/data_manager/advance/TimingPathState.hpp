@@ -43,6 +43,7 @@ class TimingPathState
   TransType get_trans_type() const { return _trans_type; }
   TransType get_predecessor_trans_type() const { return _predecessor_trans_type; }
   TransType get_crpr_clock_trans_type() const { return _crpr_clock_trans_type; }
+  TransType get_launch_clock_trans_type() const { return _launch_clock_trans_type; }
   // setter
   void set_arrival(const double arrival) { _arrival = arrival; }
   void set_slew(const double slew) { _slew = slew; }
@@ -60,6 +61,7 @@ class TimingPathState
   void set_trans_type(const TransType& trans_type) { _trans_type = trans_type; }
   void set_predecessor_trans_type(const TransType& predecessor_trans_type) { _predecessor_trans_type = predecessor_trans_type; }
   void set_crpr_clock_trans_type(const TransType& crpr_clock_trans_type) { _crpr_clock_trans_type = crpr_clock_trans_type; }
+  void set_launch_clock_trans_type(const TransType value) { _launch_clock_trans_type = value; }
   // function
 
  private:
@@ -78,6 +80,7 @@ class TimingPathState
   TransType _trans_type = TransType::kNone;
   TransType _predecessor_trans_type = TransType::kNone;
   TransType _crpr_clock_trans_type = TransType::kNone;
+  TransType _launch_clock_trans_type = TransType::kRise;
 };
 
 }  // namespace ista

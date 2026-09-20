@@ -33,7 +33,7 @@ TclCreateGeneratedClock::TclCreateGeneratedClock(const char* cmd_name, ClientDat
   for (const char* option : {"-edges", "-edge_shift"}) {
     addOption(new ecc::TclDoubleListOption(option, 0));
   }
-  for (const char* option : {"-add", "-invert", "-combinational"}) {
+  for (const char* option : {"-add", "-invert", "-preinvert", "-combinational"}) {
     addOption(new ecc::TclSwitchOption(option));
   }
 }
@@ -46,14 +46,22 @@ unsigned TclCreateGeneratedClock::exec()
     setTclError("create_generated_clock requires -source and target pins/ports");
     return 0;
   }
-  const std::vector<std::string> sources = resolveObjectList(database, getOptionOrArg("-source")->getStringList());
-  const std::vector<std::string> targets = resolveObjectList(database, getOptionOrArg("objects")->getStringList());
+  std::vector<std::string> sources;
+  std::vector<std::string> targets;
+  try {
+    sources = resolveClockSources(database, getOptionOrArg("-source")->getStringList());
+    targets = resolveClockSources(database, getOptionOrArg("objects")->getStringList());
+  } catch (const std::exception& error) {
+    setTclError(error.what());
+    return 0;
+  }
   if (sources.size() != 1 || targets.empty()) {
     setTclError("invalid generated clock source or targets");
     return 0;
   }
-  if (sources.size() != getOptionOrArg("-source")->getStringList().size() || targets.size() != getOptionOrArg("objects")->getStringList().size()) {
-    setTclError("generated clock collection contains an unknown pin or port");
+  if (getOptionOrArg("-add")->is_set_val()
+      && (!getOptionOrArg("-name")->is_set_val() || !getOptionOrArg("-master_clock")->is_set_val())) {
+    setTclError("create_generated_clock -add requires -name and -master_clock");
     return 0;
   }
   const std::string name = getOptionOrArg("-name")->is_set_val() ? getOptionOrArg("-name")->getStringVal() : targets.front();
@@ -87,6 +95,14 @@ unsigned TclCreateGeneratedClock::exec()
     ancestor = clocks.at(ancestor).get_master_clock_name();
   }
   TimingClock& master = clocks.at(master_name);
+  double master_period = master.get_period();
+  double master_rise = master.get_rise_edge();
+  double master_fall = master.get_fall_edge();
+  if (getOptionOrArg("-preinvert")->is_set_val()) {
+    const double old_rise = master_rise;
+    master_rise = master_fall;
+    master_fall = old_rise + master_period;
+  }
   int transformations = 0;
   for (const char* option : {"-divide_by", "-multiply_by", "-edges", "-combinational"}) {
     transformations += getOptionOrArg(option)->is_set_val();
@@ -95,9 +111,9 @@ unsigned TclCreateGeneratedClock::exec()
     setTclError("generated clock transformations are mutually exclusive");
     return 0;
   }
-  double period = master.get_period();
-  double rise = master.get_rise_edge();
-  double fall = master.get_fall_edge();
+  double period = master_period;
+  double rise = master_rise;
+  double fall = master_fall;
   for (const char* option : {"-divide_by", "-multiply_by"}) {
     if (!getOptionOrArg(option)->is_set_val()) {
       continue;
@@ -137,7 +153,7 @@ unsigned TclCreateGeneratedClock::exec()
         return 0;
       }
       const double index = edges[i] - 1;
-      times.push_back(std::floor(index / 2) * master.get_period() + (std::fmod(index, 2) == 0 ? master.get_rise_edge() : master.get_fall_edge()) + shifts[i]);
+      times.push_back(std::floor(index / 2) * master_period + (std::fmod(index, 2) == 0 ? master_rise : master_fall) + shifts[i]);
     }
     period = times[2] - times[0];
     rise = times[0];
@@ -171,6 +187,10 @@ unsigned TclCreateGeneratedClock::exec()
   generated.set_period(period);
   generated.set_rise_edge(rise);
   generated.set_fall_edge(fall);
+  generated.set_waveform({rise, fall});
+  if (getOptionOrArg("-comment")->is_set_val()) {
+    generated.set_comment(getOptionOrArg("-comment")->getStringVal());
+  }
   if (!getOptionOrArg("-add")->is_set_val()) {
     for (auto& [other_name, other] : clocks) {
       std::vector<std::string>& roots = other.get_source_list();

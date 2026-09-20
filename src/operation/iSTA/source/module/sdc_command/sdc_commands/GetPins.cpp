@@ -23,17 +23,17 @@ namespace ista::sdc {
 TclGetPins::TclGetPins(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
 {
   addOption(new ecc::TclStringOption("pins", 1));
-  addOption(new ecc::TclSwitchOption("-quiet"));
-  addOption(new ecc::TclSwitchOption("-regexp"));
-  addOption(new ecc::TclSwitchOption("-hierarchical"));
+  addQueryOptions(*this, true, true, true);
+  addOption(new ecc::TclSwitchOption("-leaf"));
+  addOption(new ecc::TclStringOption("-hsc", 0));
 }
 
 unsigned TclGetPins::exec()
 {
   ecc::TclOption* objects = getOptionOrArg("pins");
-  const bool regexp = getOptionOrArg("-regexp")->is_set_val();
+  const QueryOptions options = getQueryOptions(*this);
   const std::string patterns = objects->is_set_val() ? objects->getStringVal() : "*";
-  std::vector<std::string> result = queryObjects(STADM.getDatabase(), queryPatterns(patterns, regexp), QueryObjectType::kPin, regexp);
+  std::vector<std::string> result = queryObjects(STADM.getDatabase(), queryPatterns(patterns, options.regexp), QueryObjectType::kPin, options);
   if (result.empty() && !getOptionOrArg("-quiet")->is_set_val()) {
     setTclError("no pins matched: " + patterns);
     return 0;

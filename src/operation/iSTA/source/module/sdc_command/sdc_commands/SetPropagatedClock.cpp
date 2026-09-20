@@ -16,9 +16,39 @@
 // ***************************************************************************************
 #include "DataManager.hpp"
 #include "Logger.hpp"
+#include "SdcCommandUtils.hpp"
 #include "SdcCommands.hpp"
 
 namespace ista::sdc {
+
+namespace {
+
+std::set<std::string> resolvePropagatedClockObjects(Database& database, const std::vector<std::string>& objects)
+{
+  std::set<std::string> result;
+  for (const std::string& object : objects) {
+    const std::vector<std::string> direct_clocks = queryObjects(database, {object}, QueryObjectType::kClock);
+    if (!direct_clocks.empty()) {
+      result.insert(direct_clocks.begin(), direct_clocks.end());
+      continue;
+    }
+
+    const std::vector<std::string> sources = resolveClockSources(database, {object});
+    for (const std::string& source : sources) {
+      for (auto& [clock_name, clock] : database.get_timing_constraint().get_clock_map()) {
+        if (std::find(clock.get_source_list().begin(), clock.get_source_list().end(), source) != clock.get_source_list().end()) {
+          result.insert(clock_name);
+        }
+      }
+    }
+  }
+  if (result.empty()) {
+    throw std::invalid_argument("set_propagated_clock resolved to empty clock collection");
+  }
+  return result;
+}
+
+}  // namespace
 
 TclSetPropagatedClock::TclSetPropagatedClock(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
 {
@@ -38,16 +68,23 @@ unsigned TclSetPropagatedClock::exec()
     return 0;
   }
 
-  auto& clock_map = STADM.getDatabase().get_timing_constraint().get_clock_map();
-  for (const std::string& clock_name : clock_name_list) {
-    if (!clock_map.contains(clock_name)) {
-      STALOG.warn(Loc::current(), "clock '", clock_name, "' does not exist");
-      setTclError("clock does not exist");
+  Database& database = STADM.getDatabase();
+  auto& clock_map = database.get_timing_constraint().get_clock_map();
+  std::set<std::string> resolved_clocks;
+  try {
+    resolved_clocks = resolvePropagatedClockObjects(database, clock_name_list);
+  } catch (const std::exception& error) {
+    setTclError(error.what());
+    return 0;
+  }
+  for (const std::string& clock_name : resolved_clocks) {
+    if (clock_map.at(clock_name).get_source_list().empty()) {
+      setTclError("set_propagated_clock cannot be applied to virtual clock: " + clock_name);
       return 0;
     }
   }
-  for (const std::string& clock_name : clock_name_list) {
-    clock_map[clock_name].set_is_propagated(true);
+  for (const std::string& clock_name : resolved_clocks) {
+    clock_map.at(clock_name).set_is_propagated(true);
   }
   return 1;
 }

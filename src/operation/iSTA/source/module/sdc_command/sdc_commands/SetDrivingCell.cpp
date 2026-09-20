@@ -23,6 +23,7 @@ namespace ista::sdc {
 TclSetDrivingCell::TclSetDrivingCell(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
 {
   addOption(new ecc::TclStringOption("-lib_cell", 0));
+  addOption(new ecc::TclStringOption("-cell", 0));
   addOption(new ecc::TclStringOption("-library", 0));
   addOption(new ecc::TclStringOption("-pin", 0));
   addOption(new ecc::TclStringOption("-from_pin", 0));
@@ -39,9 +40,13 @@ TclSetDrivingCell::TclSetDrivingCell(const char* cmd_name, ClientData client_dat
 unsigned TclSetDrivingCell::exec()
 {
   ecc::TclOption* cell_option = getOptionOrArg("-lib_cell");
+  ecc::TclOption* cell_alias_option = getOptionOrArg("-cell");
+  if (!cell_option->is_set_val() && cell_alias_option->is_set_val()) {
+    cell_option = cell_alias_option;
+  }
   ecc::TclOption* object_option = getOptionOrArg("objects");
   if (!cell_option->is_set_val() || !object_option->is_set_val()) {
-    setTclError("set_driving_cell requires -lib_cell and an input port collection");
+    setTclError("set_driving_cell requires -lib_cell or -cell and an input port collection");
     return 0;
   }
 

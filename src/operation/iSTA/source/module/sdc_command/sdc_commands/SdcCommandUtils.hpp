@@ -20,6 +20,8 @@
 #include "STAHeader.hpp"
 namespace ista::sdc {
 
+class SdcTclCmd;
+
 enum class QueryObjectType
 {
   kPort,
@@ -29,12 +31,28 @@ enum class QueryObjectType
   kClock,
   kAny
 };
+
+struct QueryOptions
+{
+  bool regexp = false;
+  bool nocase = false;
+  bool exact = false;
+  bool hierarchical = false;
+  std::string filter;
+  std::vector<std::string> of_objects;
+};
+
 std::vector<std::string> queryPatterns(const std::string& text, bool regexp);
 std::vector<std::string> queryObjects(Database& database, const std::vector<std::string>& patterns, QueryObjectType type, bool regexp = false);
+std::vector<std::string> queryObjects(Database& database, const std::vector<std::string>& patterns, QueryObjectType type, const QueryOptions& options);
 std::set<std::string> resolveClockObjects(Database& database, const std::vector<std::string>& objects);
 std::set<std::string> resolveExceptionObjects(Database& database, const std::vector<std::string>& objects);
+std::vector<std::string> resolveClockSources(Database& database, const std::vector<std::string>& objects);
+std::vector<std::string> resolveTypedObjects(Database& database, const std::vector<std::string>& objects, QueryObjectType type);
 
 std::vector<std::string> resolveObjectList(Database& database, const std::vector<std::string>& object_list);
 TimingPortConstraint& getPortConstraint(Database& database, const std::string& port_name);
+void addQueryOptions(SdcTclCmd& command, bool hierarchical, bool exact, bool of_objects);
+QueryOptions getQueryOptions(SdcTclCmd& command);
 
 }  // namespace ista::sdc

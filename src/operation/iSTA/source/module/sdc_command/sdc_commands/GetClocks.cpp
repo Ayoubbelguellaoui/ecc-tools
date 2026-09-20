@@ -23,16 +23,15 @@ namespace ista::sdc {
 TclGetClocks::TclGetClocks(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
 {
   addOption(new ecc::TclStringOption("clocks", 1));
-  addOption(new ecc::TclSwitchOption("-quiet"));
-  addOption(new ecc::TclSwitchOption("-regexp"));
+  addQueryOptions(*this, false, false, false);
 }
 
 unsigned TclGetClocks::exec()
 {
   ecc::TclOption* objects = getOptionOrArg("clocks");
-  const bool regexp = getOptionOrArg("-regexp")->is_set_val();
+  const QueryOptions options = getQueryOptions(*this);
   const std::string patterns = objects->is_set_val() ? objects->getStringVal() : "*";
-  std::vector<std::string> result = queryObjects(STADM.getDatabase(), queryPatterns(patterns, regexp), QueryObjectType::kClock, regexp);
+  std::vector<std::string> result = queryObjects(STADM.getDatabase(), queryPatterns(patterns, options.regexp), QueryObjectType::kClock, options);
   if (result.empty() && !getOptionOrArg("-quiet")->is_set_val()) {
     setTclError("no clocks matched: " + patterns);
     return 0;

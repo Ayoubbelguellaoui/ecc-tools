@@ -23,17 +23,19 @@ namespace ista::sdc {
 TclGetNets::TclGetNets(const char* cmd_name, ClientData client_data) : SdcTclCmd(cmd_name, client_data)
 {
   addOption(new ecc::TclStringOption("nets", 1));
-  addOption(new ecc::TclSwitchOption("-quiet"));
-  addOption(new ecc::TclSwitchOption("-regexp"));
-  addOption(new ecc::TclSwitchOption("-hierarchical"));
+  addQueryOptions(*this, true, true, true);
+  addOption(new ecc::TclSwitchOption("-top_net_of_hierarchical_group"));
+  addOption(new ecc::TclSwitchOption("-segments"));
+  addOption(new ecc::TclStringOption("-boundary_type", 0));
+  addOption(new ecc::TclStringOption("-hsc", 0));
 }
 
 unsigned TclGetNets::exec()
 {
   ecc::TclOption* objects = getOptionOrArg("nets");
-  const bool regexp = getOptionOrArg("-regexp")->is_set_val();
+  const QueryOptions options = getQueryOptions(*this);
   const std::string patterns = objects->is_set_val() ? objects->getStringVal() : "*";
-  std::vector<std::string> result = queryObjects(STADM.getDatabase(), queryPatterns(patterns, regexp), QueryObjectType::kNet, regexp);
+  std::vector<std::string> result = queryObjects(STADM.getDatabase(), queryPatterns(patterns, options.regexp), QueryObjectType::kNet, options);
   if (result.empty() && !getOptionOrArg("-quiet")->is_set_val()) {
     setTclError("no nets matched: " + patterns);
     return 0;

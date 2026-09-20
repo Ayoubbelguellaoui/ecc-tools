@@ -20,6 +20,7 @@
 #include "DelayCalculator.hpp"
 #include "Logger.hpp"
 #include "Monitor.hpp"
+#include "TimingCaseAnalysis.hpp"
 
 namespace ista {
 
@@ -54,6 +55,7 @@ void ClockPropagator::propagate()
 {
   Monitor monitor;
   STALOG.info(Loc::current(), "Starting...");
+  TimingCaseAnalysis::apply(STADM.getDatabase());
   initTimingPointList();
   CPModel cp_model = initCPModel();
   buildClockSourceList(cp_model);

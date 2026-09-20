@@ -404,18 +404,8 @@ double TimingAnalyzer::getEndPointRequired(std::string& start_point, std::string
   Database& database = STADM.getDatabase();
   Pin& pin = database.get_pin_map()[end_point];
   if (pin.get_is_port()) {
-    std::map<std::string, TimingPortConstraint>& port_constraint_map = database.get_timing_constraint().get_port_constraint_map();
-    double uncertainty = getClockUncertainty(end_point, analysis_type);
-    double signed_uncertainty = analysis_type == AnalysisType::kMin ? uncertainty : -uncertainty;
-    if (analysis_type == AnalysisType::kMin && port_constraint_map.count(end_point) > 0 && port_constraint_map[end_point].get_has_output_delay_min()) {
-      return roundTime(getEndPointCaptureTime(start_point, end_point, analysis_type) - port_constraint_map[end_point].get_output_delay_min()
-                       + signed_uncertainty);
-    }
-    if (port_constraint_map.count(end_point) > 0 && port_constraint_map[end_point].get_has_output_delay_max()) {
-      return roundTime(getEndPointCaptureTime(start_point, end_point, analysis_type) - port_constraint_map[end_point].get_output_delay_max()
-                       + signed_uncertainty);
-    }
-    return default_required_time;
+    return getOutputRequiredTime(start_point, getClockName(start_point), STAUTIL.getLaunchClockTransition(database, start_point), end_point,
+                                 default_required_time, analysis_type, data_trans_type);
   }
   if (database.get_instance_map().count(pin.get_instance_name()) == 0) {
     return default_required_time;
@@ -426,10 +416,15 @@ double TimingAnalyzer::getEndPointRequired(std::string& start_point, std::string
     double check_time = getEndPointCheckTime(end_point, *timing_check_arc, analysis_type, data_trans_type, data_slew);
     std::string common_pin_name;
     double cppr = getClockReconvergencePessimism(start_point, end_point, analysis_type, common_pin_name);
+    const std::string launch_clock(getClockName(start_point));
+    const std::string capture_clock(getClockName(end_point));
+    const TransType launch_trans_type = STAUTIL.getLaunchClockTransition(database, start_point);
+    const TransType capture_trans_type = getClockTransType(*timing_check_arc);
+    const double uncertainty = getClockUncertainty(launch_clock, launch_trans_type, capture_clock, capture_trans_type, analysis_type);
     if (analysis_type == AnalysisType::kMin) {
-      return roundTime(getEndPointCaptureTime(start_point, end_point, analysis_type) + check_time - cppr + getClockUncertainty(end_point, analysis_type));
+      return roundTime(getEndPointCaptureTime(start_point, end_point, analysis_type) + check_time - cppr + uncertainty);
     }
-    return roundTime(getEndPointCaptureTime(start_point, end_point, analysis_type) - check_time + cppr - getClockUncertainty(end_point, analysis_type));
+    return roundTime(getEndPointCaptureTime(start_point, end_point, analysis_type) - check_time + cppr - uncertainty);
   }
   return default_required_time;
 }
@@ -481,6 +476,24 @@ double TimingAnalyzer::getClockUncertainty(std::string& pin_name, AnalysisType a
   return analysis_type == AnalysisType::kMin ? clock_it->second.get_hold_uncertainty() : clock_it->second.get_setup_uncertainty();
 }
 
+double TimingAnalyzer::getClockUncertainty(std::string_view launch_clock, TransType launch_trans_type, std::string_view capture_clock,
+                                           TransType capture_trans_type, AnalysisType analysis_type)
+{
+  Database& database = STADM.getDatabase();
+  TimingConstraint& constraint = database.get_timing_constraint();
+  const std::optional<double> pair_uncertainty
+      = constraint.resolve_clock_uncertainty_value(launch_clock, launch_trans_type, capture_clock, capture_trans_type, analysis_type);
+  if (pair_uncertainty.has_value()) {
+    return *pair_uncertainty;
+  }
+  auto& clock_map = constraint.get_clock_map();
+  const auto clock = clock_map.find(std::string(capture_clock));
+  if (clock == clock_map.end()) {
+    return 0.0;
+  }
+  return analysis_type == AnalysisType::kMin ? clock->second.get_hold_uncertainty() : clock->second.get_setup_uncertainty();
+}
+
 TimingClock* TimingAnalyzer::getStartPointClock(std::string& start_point)
 {
   Database& database = STADM.getDatabase();
@@ -499,8 +512,12 @@ double TimingAnalyzer::getEndPointRequired(TimingPathState& end_path_state, std:
   Database& database = STADM.getDatabase();
   Pin& pin = database.get_pin_map()[end_point];
   if (pin.get_is_port()) {
-    return getEndPointRequired(end_path_state.get_start_point(), end_point, default_required_time, analysis_type, end_path_state.get_trans_type(),
-                               end_path_state.get_slew());
+    TransType launch_trans_type = end_path_state.get_crpr_clock_trans_type();
+    if (launch_trans_type == TransType::kNone) {
+      launch_trans_type = STAUTIL.getLaunchClockTransition(database, end_path_state.get_start_point());
+    }
+    return getOutputRequiredTime(end_path_state.get_start_point(), end_path_state.get_clock_name(), launch_trans_type, end_point, default_required_time,
+                                 analysis_type, end_path_state.get_trans_type());
   }
   if (database.get_instance_map().count(pin.get_instance_name()) == 0) {
     return default_required_time;
@@ -511,12 +528,19 @@ double TimingAnalyzer::getEndPointRequired(TimingPathState& end_path_state, std:
     double check_time = getEndPointCheckTime(end_point, *timing_check_arc, analysis_type, end_path_state.get_trans_type(), end_path_state.get_slew());
     std::string common_pin_name;
     double cppr = getClockReconvergencePessimism(end_path_state, end_point, analysis_type, common_pin_name);
-    if (analysis_type == AnalysisType::kMin) {
-      return roundTime(getEndPointCaptureTime(end_path_state.get_start_point(), end_point, analysis_type) + check_time - cppr
-                       + getClockUncertainty(end_point, analysis_type));
+    TransType launch_trans_type = end_path_state.get_crpr_clock_trans_type();
+    if (launch_trans_type == TransType::kNone) {
+      launch_trans_type = STAUTIL.getLaunchClockTransition(database, end_path_state.get_start_point());
     }
-    return roundTime(getEndPointCaptureTime(end_path_state.get_start_point(), end_point, analysis_type) - check_time + cppr
-                     - getClockUncertainty(end_point, analysis_type));
+    const TransType capture_trans_type = getClockTransType(*timing_check_arc);
+    const double uncertainty = getClockUncertainty(end_path_state.get_clock_name(), launch_trans_type, getClockName(end_point), capture_trans_type,
+                                                   analysis_type);
+    if (analysis_type == AnalysisType::kMin) {
+      return roundTime(getEndPointCaptureTime(end_path_state.get_start_point(), end_point, launch_trans_type, analysis_type) + check_time - cppr
+                       + uncertainty);
+    }
+    return roundTime(getEndPointCaptureTime(end_path_state.get_start_point(), end_point, launch_trans_type, analysis_type) - check_time + cppr
+                     - uncertainty);
   }
   return default_required_time;
 }
@@ -584,20 +608,93 @@ double TimingAnalyzer::getEndPointCaptureTime(std::string& end_point, AnalysisTy
 
 double TimingAnalyzer::getEndPointCaptureTime(std::string& start_point, std::string& end_point, AnalysisType analysis_type)
 {
-  Database& database = STADM.getDatabase();
+  return getEndPointCaptureTime(start_point, end_point, STAUTIL.getLaunchClockTransition(STADM.getDatabase(), start_point), analysis_type);
+}
+
+double TimingAnalyzer::getEndPointCaptureTime(std::string& start_point, std::string& end_point, TransType launch_transition, AnalysisType analysis_type)
+{
   TimingCheckArc* check_arc = getEndPointCheckArc(end_point, analysis_type);
   TransType capture_transition = check_arc == nullptr ? TransType::kRise : getClockTransType(*check_arc);
   const std::string launch_clock(getClockName(start_point));
   const std::string capture_clock(getClockName(end_point));
+  return getEndPointCaptureTime(start_point, launch_clock, launch_transition, capture_clock, capture_transition, analysis_type)
+         + getEndPointClockArrival(end_point, getCaptureAnalysisType(analysis_type), capture_transition);
+}
+
+double TimingAnalyzer::getEndPointCaptureTime(std::string& start_point, std::string_view launch_clock, TransType launch_transition,
+                                              std::string_view capture_clock, TransType capture_transition, AnalysisType analysis_type)
+{
+  Database& database = STADM.getDatabase();
   auto& clocks = database.get_timing_constraint().get_clock_map();
-  if (!clocks.contains(launch_clock) || !clocks.contains(capture_clock)) {
+  if (!clocks.contains(std::string(launch_clock)) || !clocks.contains(std::string(capture_clock))) {
     return 0.0;
   }
-  TimingClock& capture = clocks.at(capture_clock);
-  const double launch_edge = STAUTIL.getLaunchClockEdge(database, start_point, launch_clock);
+  TimingClock& capture = clocks.at(std::string(capture_clock));
+  const double launch_edge = getClockEdge(launch_clock, launch_transition);
   const double capture_edge = capture_transition == TransType::kFall ? capture.get_fall_edge() : capture.get_rise_edge();
-  return launch_edge + STAUTIL.getClockEdgeSeparation(clocks.at(launch_clock).get_period(), capture.get_period(), launch_edge, capture_edge, analysis_type)
-         + getEndPointClockArrival(end_point, getCaptureAnalysisType(analysis_type), capture_transition);
+  return launch_edge
+         + STAUTIL.getClockEdgeSeparation(clocks.at(std::string(launch_clock)).get_period(), capture.get_period(), launch_edge, capture_edge,
+                                          analysis_type);
+}
+
+double TimingAnalyzer::getClockEdge(std::string_view clock_name, TransType trans_type)
+{
+  Database& database = STADM.getDatabase();
+  const auto clock = database.get_timing_constraint().get_clock_map().find(std::string(clock_name));
+  if (clock == database.get_timing_constraint().get_clock_map().end()) {
+    return 0.0;
+  }
+  return trans_type == TransType::kFall ? clock->second.get_fall_edge() : clock->second.get_rise_edge();
+}
+
+std::vector<const TimingIoDelay*> TimingAnalyzer::getOutputDelayList(std::string& end_point, AnalysisType analysis_type, TransType trans_type)
+{
+  Database& database = STADM.getDatabase();
+  const auto constraint = database.get_timing_constraint().get_port_constraint_map().find(end_point);
+  if (constraint == database.get_timing_constraint().get_port_constraint_map().end()) {
+    return {};
+  }
+  std::vector<const TimingIoDelay*> delays = constraint->second.get_output_delays(analysis_type, trans_type);
+  if (delays.empty() && analysis_type == AnalysisType::kMin) {
+    delays = constraint->second.get_output_delays(AnalysisType::kMax, trans_type);
+  }
+  return delays;
+}
+
+double TimingAnalyzer::getOutputRequiredTime(std::string& start_point, std::string_view launch_clock, TransType launch_trans_type, std::string& end_point,
+                                             double default_required_time, AnalysisType analysis_type, TransType data_trans_type)
+{
+  Database& database = STADM.getDatabase();
+  const std::vector<const TimingIoDelay*> delays = getOutputDelayList(end_point, analysis_type, data_trans_type);
+  if (delays.empty()) {
+    std::map<std::string, TimingPortConstraint>& port_constraint_map = database.get_timing_constraint().get_port_constraint_map();
+    const double uncertainty = getClockUncertainty(launch_clock, launch_trans_type, getClockName(end_point), TransType::kRise, analysis_type);
+    const double signed_uncertainty = analysis_type == AnalysisType::kMin ? uncertainty : -uncertainty;
+    if (analysis_type == AnalysisType::kMin && port_constraint_map.count(end_point) > 0 && port_constraint_map[end_point].get_has_output_delay_min()) {
+      return roundTime(getEndPointCaptureTime(start_point, launch_clock, launch_trans_type, getClockName(end_point), TransType::kRise, analysis_type)
+                       - port_constraint_map[end_point].get_output_delay_min() + signed_uncertainty);
+    }
+    if (port_constraint_map.count(end_point) > 0 && port_constraint_map[end_point].get_has_output_delay_max()) {
+      return roundTime(getEndPointCaptureTime(start_point, launch_clock, launch_trans_type, getClockName(end_point), TransType::kRise, analysis_type)
+                       - port_constraint_map[end_point].get_output_delay_max() + signed_uncertainty);
+    }
+    return default_required_time;
+  }
+
+  double required = 0.0;
+  bool has_required = false;
+  for (const TimingIoDelay* delay : delays) {
+    const std::string capture_clock = delay->get_clock_name().empty() ? std::string(getClockName(end_point)) : delay->get_clock_name();
+    const TransType capture_trans_type = delay->get_clock_trans_type();
+    const double uncertainty = getClockUncertainty(launch_clock, launch_trans_type, capture_clock, capture_trans_type, analysis_type);
+    const double candidate = roundTime(getEndPointCaptureTime(start_point, launch_clock, launch_trans_type, capture_clock, capture_trans_type, analysis_type)
+                                       - delay->get_delay() + (analysis_type == AnalysisType::kMin ? uncertainty : -uncertainty));
+    if (!has_required || (analysis_type == AnalysisType::kMin ? candidate > required : candidate < required)) {
+      required = candidate;
+      has_required = true;
+    }
+  }
+  return has_required ? required : default_required_time;
 }
 
 double TimingAnalyzer::getEndPointClockArrival(std::string& end_point, AnalysisType analysis_type)
@@ -1324,7 +1421,11 @@ double TimingAnalyzer::calcPathDelayRequiredTime(std::string& end_point, TimingP
                                                  const TimingException& exception, double normal_required_time)
 {
   Database& database = STADM.getDatabase();
-  const double normal_capture_time = getEndPointCaptureTime(end_path_state.get_start_point(), end_point, analysis_type);
+  TransType launch_trans_type = end_path_state.get_crpr_clock_trans_type();
+  if (launch_trans_type == TransType::kNone) {
+    launch_trans_type = STAUTIL.getLaunchClockTransition(database, end_path_state.get_start_point());
+  }
+  const double normal_capture_time = getEndPointCaptureTime(end_path_state.get_start_point(), end_point, launch_trans_type, analysis_type);
   double endpoint_margin = normal_required_time - normal_capture_time;
   Pin& pin = database.get_pin_map()[end_point];
   if (pin.get_is_port()) {
@@ -1342,7 +1443,7 @@ double TimingAnalyzer::calcPathDelayRequiredTime(std::string& end_point, TimingP
   if (!exception.get_ignore_clock_latency()) {
     TimingCheckArc* timing_check_arc = getEndPointCheckArc(end_point, analysis_type);
     const TransType capture_transition = timing_check_arc == nullptr ? TransType::kRise : getClockTransType(*timing_check_arc);
-    anchor = STAUTIL.getLaunchClockEdge(database, end_path_state.get_start_point(), end_path_state.get_clock_name())
+    anchor = getClockEdge(end_path_state.get_clock_name(), launch_trans_type)
              + getEndPointClockArrival(end_point, getCaptureAnalysisType(analysis_type), capture_transition);
   }
   return roundTime(anchor + exception.get_delay() + endpoint_margin);
@@ -1549,10 +1650,13 @@ void TimingAnalyzer::updateClockInfo(TimingPath& timing_path, AnalysisType analy
   if (analysis_type == AnalysisType::kMin) {
     cppr = -cppr;
   }
+  TransType launch_trans_type = end_path_state.get_crpr_clock_trans_type();
+  if (launch_trans_type == TransType::kNone) {
+    launch_trans_type = STAUTIL.getLaunchClockTransition(database, start_point);
+  }
   timing_path.set_last_common_pin(common_pin_name);
-  timing_path.set_capture_time(getEndPointCaptureTime(start_point, timing_path.get_end_point(), analysis_type) + cppr);
-  timing_path.set_launch_clock_network_delay(end_path_state.get_launch_time()
-                                             - STAUTIL.getLaunchClockEdge(database, start_point, end_path_state.get_clock_name()));
+  timing_path.set_capture_time(getEndPointCaptureTime(start_point, timing_path.get_end_point(), launch_trans_type, analysis_type) + cppr);
+  timing_path.set_launch_clock_network_delay(end_path_state.get_launch_time() - getClockEdge(end_path_state.get_clock_name(), launch_trans_type));
   TimingCheckArc* timing_check_arc = getEndPointCheckArc(timing_path.get_end_point(), analysis_type);
   TransType capture_trans_type = timing_check_arc == nullptr ? TransType::kRise : getClockTransType(*timing_check_arc);
   timing_path.set_capture_clock_transition(capture_trans_type);

@@ -76,6 +76,8 @@ class TimingAnalyzer
                              TransType data_trans_type, double data_slew);
   std::string_view getClockName(std::string& pin_name);
   double getClockUncertainty(std::string& pin_name, AnalysisType analysis_type);
+  double getClockUncertainty(std::string_view launch_clock, TransType launch_trans_type, std::string_view capture_clock, TransType capture_trans_type,
+                             AnalysisType analysis_type);
   TimingClock* getStartPointClock(std::string& start_point);
   double getEndPointRequired(TimingPathState& end_path_state, std::string& end_point, double default_required_time, AnalysisType analysis_type);
   bool isMatchCheckTransType(TimingCheckArc& timing_check_arc, TransType data_trans_type);
@@ -87,6 +89,13 @@ class TimingAnalyzer
   TransType getClockTransType(TimingCheckArc& timing_check_arc);
   double getEndPointCaptureTime(std::string& end_point, AnalysisType analysis_type);
   double getEndPointCaptureTime(std::string& start_point, std::string& end_point, AnalysisType analysis_type);
+  double getEndPointCaptureTime(std::string& start_point, std::string& end_point, TransType launch_transition, AnalysisType analysis_type);
+  double getEndPointCaptureTime(std::string& start_point, std::string_view launch_clock, TransType launch_transition, std::string_view capture_clock,
+                                TransType capture_transition, AnalysisType analysis_type);
+  double getClockEdge(std::string_view clock_name, TransType trans_type);
+  std::vector<const TimingIoDelay*> getOutputDelayList(std::string& end_point, AnalysisType analysis_type, TransType trans_type);
+  double getOutputRequiredTime(std::string& start_point, std::string_view launch_clock, TransType launch_trans_type, std::string& end_point,
+                               double default_required_time, AnalysisType analysis_type, TransType data_trans_type);
   double getEndPointClockArrival(std::string& end_point, AnalysisType analysis_type);
   double getEndPointClockArrival(std::string& end_point, AnalysisType analysis_type, TransType trans_type);
   double getClockReconvergencePessimism(TimingPathState& end_path_state, std::string& end_point, AnalysisType analysis_type, std::string& common_pin_name);

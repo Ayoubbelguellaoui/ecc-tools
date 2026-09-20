@@ -38,6 +38,8 @@ class TimingClock
   bool get_is_propagated() const { return _is_propagated; }
   const std::string& get_master_clock_name() const { return _master_clock_name; }
   const std::string& get_master_source() const { return _master_source; }
+  const std::vector<double>& get_waveform() const { return _waveform; }
+  const std::string& get_comment() const { return _comment; }
   bool get_is_generated() const { return !_master_clock_name.empty(); }
   std::map<AnalysisType, std::map<TransType, double>>& get_transition_map() { return _transition_map; }
   // setter
@@ -51,6 +53,8 @@ class TimingClock
   void set_is_propagated(const bool is_propagated) { _is_propagated = is_propagated; }
   void set_master_clock_name(const std::string& name) { _master_clock_name = name; }
   void set_master_source(const std::string& source) { _master_source = source; }
+  void set_waveform(std::vector<double> waveform) { _waveform = std::move(waveform); }
+  void set_comment(std::string comment) { _comment = std::move(comment); }
   // function
 
  private:
@@ -65,6 +69,8 @@ class TimingClock
   double _hold_uncertainty = 0.0;
   bool _is_propagated = false;
   std::map<AnalysisType, std::map<TransType, double>> _transition_map;
+  std::vector<double> _waveform;
+  std::string _comment;
 };
 
 }  // namespace ista

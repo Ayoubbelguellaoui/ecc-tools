@@ -26,6 +26,31 @@ TclSetCaseAnalysis::TclSetCaseAnalysis(const char* cmd_name, ClientData client_d
   addOption(new ecc::TclStringListOption("objects", 1));
 }
 
+namespace {
+
+std::optional<TimingCaseValue> parseCaseValue(std::string value)
+{
+  std::transform(value.begin(), value.end(), value.begin(), [](unsigned char character) { return std::tolower(character); });
+  if (value == "0" || value == "zero") {
+    return TimingCaseValue::kZero;
+  }
+  if (value == "1" || value == "one") {
+    return TimingCaseValue::kOne;
+  }
+  if (value == "static") {
+    return TimingCaseValue::kStatic;
+  }
+  if (value == "rise" || value == "rising") {
+    return TimingCaseValue::kRise;
+  }
+  if (value == "fall" || value == "falling") {
+    return TimingCaseValue::kFall;
+  }
+  return std::nullopt;
+}
+
+}  // namespace
+
 unsigned TclSetCaseAnalysis::exec()
 {
   auto& data_manager = DataManager::getInst();
@@ -37,16 +62,20 @@ unsigned TclSetCaseAnalysis::exec()
     return 0;
   }
 
-  const std::string value = value_option->getStringVal();
-  if (value != "0" && value != "1") {
-    setTclError("set_case_analysis value must be 0 or 1");
+  const std::optional<TimingCaseValue> case_value = parseCaseValue(value_option->getStringVal());
+  if (!case_value.has_value()) {
+    setTclError("set_case_analysis value must be 0, 1, zero, one, static, rise, or fall");
     return 0;
   }
 
-  const bool case_value = value == "1";
   auto& case_analysis_map = data_manager.getDatabase().get_timing_constraint().get_case_analysis_map();
-  for (const std::string& pin_name : resolveObjectList(data_manager.getDatabase(), object_option->getStringList())) {
-    case_analysis_map[pin_name] = case_value;
+  const std::vector<std::string> objects = resolveObjectList(data_manager.getDatabase(), object_option->getStringList());
+  if (objects.empty()) {
+    setTclError("set_case_analysis requires at least one pin or port object");
+    return 0;
+  }
+  for (const std::string& pin_name : objects) {
+    case_analysis_map[pin_name] = *case_value;
   }
   return 1;
 }

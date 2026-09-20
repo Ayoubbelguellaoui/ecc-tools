@@ -26,6 +26,8 @@ TclSetInputTransition::TclSetInputTransition(const char* cmd_name, ClientData cl
   addOption(new ecc::TclSwitchOption("-fall"));
   addOption(new ecc::TclSwitchOption("-min"));
   addOption(new ecc::TclSwitchOption("-max"));
+  addOption(new ecc::TclStringOption("-clock", 0));
+  addOption(new ecc::TclSwitchOption("-clock_fall"));
   addOption(new ecc::TclDoubleOption("transition", 1));
   addOption(new ecc::TclStringListOption("objects", 1));
 }

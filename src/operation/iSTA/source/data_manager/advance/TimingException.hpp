@@ -121,6 +121,14 @@ struct ResolvedTimingExceptions
   const TimingException* hold_multicycle = nullptr;
 };
 
+enum class TimingClockGroupType
+{
+  kAsynchronous,
+  kLogicallyExclusive,
+  kPhysicallyExclusive,
+  kExclusive
+};
+
 class TimingClockGroup
 {
  public:
@@ -129,14 +137,23 @@ class TimingClockGroup
   // getter
   const std::vector<std::set<std::string>>& get_groups() const { return _groups; }
   bool get_allow_paths() const { return _allow_paths; }
+  TimingClockGroupType get_type() const { return _type; }
+  const std::string& get_name() const { return _name; }
+  const std::string& get_comment() const { return _comment; }
   // setter
   void set_groups(const std::vector<std::set<std::string>>& groups) { _groups = groups; }
   void set_allow_paths(bool value) { _allow_paths = value; }
+  void set_type(TimingClockGroupType value) { _type = value; }
+  void set_name(std::string value) { _name = std::move(value); }
+  void set_comment(std::string value) { _comment = std::move(value); }
   // function
 
  private:
   std::vector<std::set<std::string>> _groups;
   bool _allow_paths = false;
+  TimingClockGroupType _type = TimingClockGroupType::kAsynchronous;
+  std::string _name;
+  std::string _comment;
 };
 
 }  // namespace ista
