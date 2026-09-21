@@ -130,6 +130,9 @@ void STAInterface::initSTA(std::map<std::string, std::any> config_map)
       {"get_pins", sdc::executeTclCommand<sdc::TclGetPins>},
       {"all_inputs", sdc::executeTclCommand<sdc::TclAllInputs>},
       {"all_outputs", sdc::executeTclCommand<sdc::TclAllOutputs>},
+      {"all_clocks", sdc::executeTclCommand<sdc::TclAllClocks>},
+      {"get_full_name", sdc::executeTclCommand<sdc::TclGetFullName>},
+      {"get_object_name", sdc::executeTclCommand<sdc::TclGetFullName>},
       {"set_propagated_clock", sdc::executeTclCommand<sdc::TclSetPropagatedClock>},
   });
   STADM.readConstraint();

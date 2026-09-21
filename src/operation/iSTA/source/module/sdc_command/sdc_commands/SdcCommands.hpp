@@ -92,6 +92,22 @@ class TclAllOutputs : public SdcTclCmd
   unsigned exec() override;
 };
 
+class TclAllClocks : public SdcTclCmd
+{
+ public:
+  TclAllClocks(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclGetFullName : public SdcTclCmd
+{
+ public:
+  TclGetFullName(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
 class TclSetFalsePath : public TclPathException
 {
  public:

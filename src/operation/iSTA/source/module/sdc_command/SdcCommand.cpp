@@ -51,6 +51,21 @@ std::filesystem::path findBundledTclLibrary()
 #endif
 }
 
+void importScreenConstraintVariables(Tcl_Interp* interp)
+{
+  // The William MCU screening SDC intentionally uses Tcl globals so the same
+  // file can be sourced by PrimeTime, OpenSTA, or iSTA.  Import the documented
+  // environment overrides into the embedded interpreter and clear values left
+  // by a previous in-process STA run.
+  for (const char* name : {"MCU_MHZ", "MCU_VIEW"}) {
+    Tcl_UnsetVar(interp, name, TCL_GLOBAL_ONLY);
+    Tcl_ResetResult(interp);
+    if (const char* value = std::getenv(name); value != nullptr) {
+      Tcl_SetVar(interp, name, value, TCL_GLOBAL_ONLY);
+    }
+  }
+}
+
 }  // namespace
 
 void SdcCommand::initInst()
@@ -131,6 +146,7 @@ int SdcCommand::evalScriptFile(const std::string& file_name)
   }
 
   const std::string script((std::istreambuf_iterator<char>(script_file)), std::istreambuf_iterator<char>());
+  importScreenConstraintVariables(_interp);
   return evalScript(script);
 }
 
@@ -155,6 +171,15 @@ int SdcCommand::evalScript(const std::string& script)
     Tcl_Parse parse{};
     const char* command_start = script.data() + offset;
     const int parse_result = Tcl_ParseCommand(_interp, command_start, static_cast<int>(script.size() - offset), 0, &parse);
+    if (parse_result != TCL_OK) {
+      const char* error_start = parse.commandStart != nullptr ? parse.commandStart : command_start;
+      const unsigned command_line = line_number + static_cast<unsigned>(std::count(command_start, error_start, '\n'));
+      addError(command_line, Tcl_GetStringResult(_interp));
+      Tcl_ResetResult(_interp);
+      Tcl_FreeParse(&parse);
+      return TCL_ERROR;
+    }
+
     const char* command_end = parse.commandStart + parse.commandSize;
     std::size_t consumed = static_cast<std::size_t>(command_end - command_start);
     if (consumed == 0) {
@@ -162,12 +187,6 @@ int SdcCommand::evalScript(const std::string& script)
     }
 
     const unsigned command_line = line_number + static_cast<unsigned>(std::count(command_start, parse.commandStart, '\n'));
-    if (parse_result != TCL_OK) {
-      addError(command_line, Tcl_GetStringResult(_interp));
-      Tcl_ResetResult(_interp);
-      Tcl_FreeParse(&parse);
-      return TCL_ERROR;
-    }
 
     if (parse.numWords > 0) {
       Tcl_SetErrorLine(_interp, static_cast<int>(command_line));
@@ -175,7 +194,8 @@ int SdcCommand::evalScript(const std::string& script)
       if (command_result != TCL_OK) {
         addError(command_line, Tcl_GetStringResult(_interp));
         Tcl_ResetResult(_interp);
-        result = TCL_ERROR;
+        Tcl_FreeParse(&parse);
+        return TCL_ERROR;
       }
     }
 

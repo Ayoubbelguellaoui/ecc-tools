@@ -51,6 +51,7 @@ std::vector<std::string> resolveClockSources(Database& database, const std::vect
 std::vector<std::string> resolveTypedObjects(Database& database, const std::vector<std::string>& objects, QueryObjectType type);
 
 std::vector<std::string> resolveObjectList(Database& database, const std::vector<std::string>& object_list);
+std::vector<std::string> resolveFullNames(Database& database, const std::string& object_list);
 TimingPortConstraint& getPortConstraint(Database& database, const std::string& port_name);
 void addQueryOptions(SdcTclCmd& command, bool hierarchical, bool exact, bool of_objects);
 QueryOptions getQueryOptions(SdcTclCmd& command);

@@ -8,6 +8,7 @@ add_library(ista_sdc_command
     ${ISTA_MODULE}/sdc_command/sdc_commands/GetNets.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/GetPins.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/AllPorts.cpp
+    ${ISTA_MODULE}/sdc_command/sdc_commands/GetObjectNames.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetClockGroups.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/PathExceptionCommand.cpp
     ${ISTA_MODULE}/sdc_command/sdc_commands/SetFalsePath.cpp

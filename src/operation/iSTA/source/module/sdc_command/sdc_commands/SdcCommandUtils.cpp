@@ -466,6 +466,41 @@ std::vector<std::string> resolveObjectList(Database& database, const std::vector
   return resolved_object_list;
 }
 
+std::vector<std::string> resolveFullNames(Database& database, const std::string& object_list)
+{
+  const std::vector<std::string> patterns = queryPatterns(object_list, false);
+  if (patterns.empty()) {
+    // An empty collection is a valid result of get_ports/get_pins and must
+    // remain an empty collection when passed to get_full_name.
+    return {};
+  }
+
+  const std::vector<QueryCandidate> candidates = buildCandidates(database, QueryObjectType::kAny);
+  std::map<std::string, std::string> full_names;
+  for (const QueryCandidate& candidate : candidates) {
+    full_names.emplace(candidate.canonical_name, candidate.attributes.at("full_name"));
+  }
+
+  std::vector<std::string> result;
+  std::set<std::string> emitted;
+  for (const std::string& pattern : patterns) {
+    const std::vector<std::string> matches = queryObjects(database, {pattern}, QueryObjectType::kAny);
+    if (matches.empty()) {
+      throw std::invalid_argument("object '" + pattern + "' does not exist");
+    }
+    for (const std::string& match : matches) {
+      const auto full_name = full_names.find(match);
+      if (full_name == full_names.end()) {
+        throw std::invalid_argument("object '" + match + "' has no full name");
+      }
+      if (emitted.insert(full_name->second).second) {
+        result.push_back(full_name->second);
+      }
+    }
+  }
+  return result;
+}
+
 TimingPortConstraint& getPortConstraint(Database& database, const std::string& port_name)
 {
   TimingPortConstraint& port_constraint = database.get_timing_constraint().get_port_constraint_map()[port_name];

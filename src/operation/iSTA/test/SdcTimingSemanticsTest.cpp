@@ -217,6 +217,120 @@ void testQueriesAndGeneratedClocks()
   require(clocks.size() == size, "invalid generated clock mutated database");
   ClockPropagator::getInst().propagate();  // Several modes on a terminal clock output are legal.
 }
+
+void testClockAndObjectNameCompatibility()
+{
+  fixture();
+  command("if {[all_clocks] ne {c d}} {error all_clocks}");
+  command("if {[get_full_name [get_ports clock]] ne {clock}} {error port_full_name}");
+  command("if {[get_full_name [get_pins merge/Z]] ne {merge/Z}} {error pin_full_name}");
+  command("if {[get_object_name [get_clocks c]] ne {c}} {error object_name}");
+  command("if {[llength [get_full_name [get_ports -quiet missing]]] != 0} {error empty_collection}");
+  command("if {[llength [get_full_name [get_pins -regexp {sync\\.s_dat\\[0\\]_[0-1]:D}]]] != 2 || [lindex [get_full_name [get_pins -regexp {sync\\.s_dat\\[0\\]_[0-1]:D}]] 0] ne {sync.s_dat[0]_0/D} || [lindex [get_full_name [get_pins -regexp {sync\\.s_dat\\[0\\]_[0-1]:D}]] 1] ne {sync.s_dat[0]_1/D}} {error list_full_name}");
+  command("get_full_name missing", false);
+  command("all_clocks unexpected", false);
+}
+
+void screenFixture()
+{
+  STADM.getDatabase() = Database();
+  STADC.init();
+  STADM.getDatabase().set_design_name("ysyxSoC_direct_clock");
+  for (const std::string name : {"clock", "reset", "jtag_tck_i", "jtag_tms_i", "jtag_tdi_i", "data_in"}) {
+    pin(name, true, PinDirection::kInput);
+  }
+  for (const std::string name : {"jtag_tdo_o", "data_out"}) {
+    pin(name, true, PinDirection::kOutput);
+  }
+}
+
+void testWilliamScreenSdc()
+{
+  const char* screen_sdc = std::getenv("ISTA_WILLIAM_SCREEN_SDC");
+  if (screen_sdc == nullptr || *screen_sdc == '\0') {
+    return;
+  }
+
+  struct Scenario
+  {
+    int mhz;
+    const char* view;
+    double period;
+  };
+  const std::vector<Scenario> scenarios = {{8, "RAW", 125.0}, {8, "RUN", 125.0}, {72, "RAW", 1000.0 / 72.0},
+                                           {72, "RUN", 1000.0 / 72.0}, {100, "RAW", 10.0}, {100, "RUN", 10.0}};
+  for (const Scenario& scenario : scenarios) {
+    screenFixture();
+    const std::string mhz = std::to_string(scenario.mhz);
+    setenv("MCU_MHZ", mhz.c_str(), 1);
+    setenv("MCU_VIEW", scenario.view, 1);
+    SdcCommand::getInst().clearErrors();
+    const int screen_result = SdcCommand::getInst().evalScriptFile(screen_sdc);
+    if (screen_result != TCL_OK) {
+      std::string details;
+      for (const SdcError& error : SdcCommand::getInst().getErrors()) {
+        details += " line " + std::to_string(error.line_number) + ": " + error.message;
+      }
+      require(false, "William screen SDC failed:" + details);
+    }
+    require(SdcCommand::getInst().getErrors().empty(), "William screen SDC recorded an error");
+
+    TimingConstraint& constraints = STADM.getDatabase().get_timing_constraint();
+    require(constraints.get_clock_map().size() == 2, "screen SDC clock count");
+    TimingClock& core = constraints.get_clock_map().at("core_clk");
+    TimingClock& jtag = constraints.get_clock_map().at("jtag_tck");
+    near(core.get_period(), scenario.period, "screen core clock period");
+    near(jtag.get_period(), 100.0, "screen JTAG clock period");
+    for (TimingClock* clock : {&core, &jtag}) {
+      near(clock->get_setup_uncertainty(), 0.2, "screen setup uncertainty");
+      near(clock->get_hold_uncertainty(), 0.05, "screen hold uncertainty");
+      for (AnalysisType analysis_type : {AnalysisType::kMin, AnalysisType::kMax}) {
+        for (TransType trans_type : {TransType::kRise, TransType::kFall}) {
+          near(clock->get_transition_map().at(analysis_type).at(trans_type), 0.1, "screen clock transition");
+        }
+      }
+    }
+
+    require(constraints.get_clock_group_list().size() == 1, "screen clock group count");
+    const TimingClockGroup& group = constraints.get_clock_group_list().front();
+    require(group.get_type() == TimingClockGroupType::kAsynchronous && group.get_groups().size() == 2, "screen asynchronous clocks");
+    require(group.get_groups()[0].contains("core_clk") && group.get_groups()[1].contains("jtag_tck"), "screen clock group members");
+
+    for (const char* name_value : {"reset", "jtag_tms_i", "jtag_tdi_i", "data_in"}) {
+      const std::string name = name_value;
+      TimingPortConstraint& port = constraints.get_port_constraint_map().at(name);
+      const std::string expected_clock = name == "jtag_tms_i" || name == "jtag_tdi_i" ? "jtag_tck" : "core_clk";
+      require(port.get_input_delays(AnalysisType::kMin, TransType::kRise).size() == 1, "screen input minimum delay");
+      require(port.get_input_delays(AnalysisType::kMax, TransType::kRise).size() == 1, "screen input maximum delay");
+      require(port.get_input_delays(AnalysisType::kMin, TransType::kRise).front()->get_clock_name() == expected_clock,
+              "screen input delay clock");
+      near(port.get_input_delay_min(), 0.0, "screen input minimum delay value");
+      near(port.get_input_delay_max(), 0.0, "screen input maximum delay value");
+      near(port.get_input_transition(), 0.1, "screen input transition");
+    }
+    require(!constraints.get_port_constraint_map().contains("clock"), "screen clock input delay");
+    for (const char* name_value : {"jtag_tdo_o", "data_out"}) {
+      const std::string name = name_value;
+      TimingPortConstraint& port = constraints.get_port_constraint_map().at(name);
+      const std::string expected_clock = name == "jtag_tdo_o" ? "jtag_tck" : "core_clk";
+      require(port.get_output_delays(AnalysisType::kMin, TransType::kRise).size() == 1, "screen output minimum delay");
+      require(port.get_output_delays(AnalysisType::kMax, TransType::kRise).size() == 1, "screen output maximum delay");
+      require(port.get_output_delays(AnalysisType::kMin, TransType::kRise).front()->get_clock_name() == expected_clock,
+              "screen output delay clock");
+      near(port.get_output_delay_min(), 0.0, "screen output minimum delay value");
+      near(port.get_output_delay_max(), 0.0, "screen output maximum delay value");
+      near(port.get_load(), 0.015, "screen output load");
+    }
+    if (std::string(scenario.view) == "RUN") {
+      require(constraints.get_case_analysis_map().at("reset") == TimingCaseValue::kZero, "screen RUN reset case analysis");
+    } else {
+      require(constraints.get_case_analysis_map().empty(), "screen RAW reset case analysis");
+    }
+  }
+  unsetenv("MCU_MHZ");
+  unsetenv("MCU_VIEW");
+}
+
 void testExceptionsPreserveAlternatives()
 {
   fixture();
@@ -824,8 +938,12 @@ int main()
       {"get_clocks", sdc::executeTclCommand<sdc::TclGetClocks>},
       {"all_inputs", sdc::executeTclCommand<sdc::TclAllInputs>},
       {"all_outputs", sdc::executeTclCommand<sdc::TclAllOutputs>},
+      {"all_clocks", sdc::executeTclCommand<sdc::TclAllClocks>},
+      {"get_full_name", sdc::executeTclCommand<sdc::TclGetFullName>},
+      {"get_object_name", sdc::executeTclCommand<sdc::TclGetFullName>},
       {"set_input_delay", sdc::executeTclCommand<sdc::TclSetInputDelay>},
       {"set_output_delay", sdc::executeTclCommand<sdc::TclSetOutputDelay>},
+      {"set_case_analysis", sdc::executeTclCommand<sdc::TclSetCaseAnalysis>},
       {"set_false_path", sdc::executeTclCommand<sdc::TclSetFalsePath>},
       {"set_max_delay", sdc::executeTclCommand<sdc::TclSetMaxDelay>},
       {"set_min_delay", sdc::executeTclCommand<sdc::TclSetMinDelay>},
@@ -839,6 +957,8 @@ int main()
     testKivenEnvironmentConstraints();
     testCaseAnalysisNoopWithoutConstraints();
     testQueriesAndGeneratedClocks();
+    testClockAndObjectNameCompatibility();
+    testWilliamScreenSdc();
     testExceptionsPreserveAlternatives();
     testOrderedFalsePathExceptions();
     testPathDelayAndMulticycleExceptions();
