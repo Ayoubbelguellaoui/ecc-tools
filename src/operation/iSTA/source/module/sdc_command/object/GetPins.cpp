@@ -25,18 +25,21 @@ TclGetPins::TclGetPins(const char* cmd_name, ClientData client_data) : SdcTclCmd
   addOption(new ecc::TclStringOption("pins", 1));
   addObjectQueryOptions(*this, true, true, true);
   addOption(new ecc::TclSwitchOption("-leaf"));
-  addOption(new ecc::TclStringOption("-hsc", 0));
 }
 
 unsigned TclGetPins::exec()
 {
   ecc::TclOption* objects = getOptionOrArg("pins");
   const ObjectQueryOptions options = getObjectQueryOptions(*this);
+  if (const auto error = getObjectQueryError(options, objects->is_set_val())) return setTclError("get_pins " + *error), 0;
   const std::string patterns = objects->is_set_val() ? objects->getStringVal() : "*";
   std::vector<std::string> result = findObjects(STADM.getDatabase(), parseObjectPatterns(patterns, options.regexp), QueryObjectType::kPin, options);
+  if (getOptionOrArg("-leaf")->is_set_val()) {
+    const auto& pins = STADM.getDatabase().get_pin_map();
+    std::erase_if(result, [&](const std::string& name) { return !pins.contains(name) || pins.at(name).get_is_port(); });
+  }
   if (result.empty() && !getOptionOrArg("-quiet")->is_set_val()) {
-    setTclError("no pins matched: " + patterns);
-    return 0;
+    warn("no pins matched: " + patterns);
   }
   setResult(std::move(result));
   return 1;

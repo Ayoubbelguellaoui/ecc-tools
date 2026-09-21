@@ -10,6 +10,8 @@
 // ***************************************************************************************
 #include "ObjectFilter.hpp"
 
+#include "SdcCommand.hpp"
+
 #include <cmath>
 #include <cstdlib>
 #include <string_view>
@@ -81,19 +83,19 @@ bool parseFilterNumber(const std::string& text, double& value)
   return end != text.c_str() && *end == '\0' && std::isfinite(value);
 }
 
-bool evaluateFilterExpression(const std::string& raw_expression, const std::map<std::string, std::string>& attributes)
+bool evaluateFilterExpression(const std::string& raw_expression, const std::map<std::string, std::string>& attributes, bool regexp, bool nocase)
 {
   const std::string expression = trimFilterText(raw_expression);
   if (expression.empty()) return true;
   for (std::string_view operation : {std::string_view("||"), std::string_view("&&")}) {
     const std::size_t position = findFilterOperator(expression, operation);
     if (position != std::string::npos) {
-      const bool left = evaluateFilterExpression(expression.substr(0, position), attributes);
-      const bool right = evaluateFilterExpression(expression.substr(position + operation.size()), attributes);
+      const bool left = evaluateFilterExpression(expression.substr(0, position), attributes, regexp, nocase);
+      const bool right = evaluateFilterExpression(expression.substr(position + operation.size()), attributes, regexp, nocase);
       return operation == "||" ? left || right : left && right;
     }
   }
-  if (expression.front() == '!') return !evaluateFilterExpression(expression.substr(1), attributes);
+  if (expression.front() == '!') return !evaluateFilterExpression(expression.substr(1), attributes, regexp, nocase);
 
   for (std::string_view operation : {std::string_view("!~"), std::string_view("=~"), std::string_view("!="), std::string_view("=="),
                                      std::string_view(">="), std::string_view("<="), std::string_view(">"), std::string_view("<")}) {
@@ -102,10 +104,25 @@ bool evaluateFilterExpression(const std::string& raw_expression, const std::map<
     const std::string attribute = trimFilterText(expression.substr(0, position));
     const std::string expected = trimFilterText(expression.substr(position + operation.size()));
     const auto actual_iter = attributes.find(attribute);
-    if (actual_iter == attributes.end()) return false;
+    if (actual_iter == attributes.end()) throw std::invalid_argument("unknown filter attribute: " + attribute);
     const std::string& actual = actual_iter->second;
     if (operation == "=~" || operation == "!~") {
-      const bool match = Tcl_StringMatch(actual.c_str(), expected.c_str()) != 0;
+      bool match = false;
+      if (regexp) {
+        const std::string pattern = std::string(nocase ? "(?i)" : "") + "^(?:" + expected + ")$";
+        if (Tcl_RegExpMatch(SdcCommand::getInst().getInterp(), "", pattern.c_str()) < 0) {
+          throw std::invalid_argument("invalid filter regular expression: " + expected);
+        }
+        match = Tcl_RegExpMatch(SdcCommand::getInst().getInterp(), actual.c_str(), pattern.c_str()) == 1;
+      } else if (nocase) {
+        std::string folded_actual = actual;
+        std::string folded_expected = expected;
+        std::transform(folded_actual.begin(), folded_actual.end(), folded_actual.begin(), [](unsigned char value) { return std::tolower(value); });
+        std::transform(folded_expected.begin(), folded_expected.end(), folded_expected.begin(), [](unsigned char value) { return std::tolower(value); });
+        match = Tcl_StringMatch(folded_actual.c_str(), folded_expected.c_str()) != 0;
+      } else {
+        match = Tcl_StringMatch(actual.c_str(), expected.c_str()) != 0;
+      }
       return operation == "=~" ? match : !match;
     }
     if (operation == "==" || operation == "!=") {
@@ -114,7 +131,9 @@ bool evaluateFilterExpression(const std::string& raw_expression, const std::map<
     }
     double left = 0.0;
     double right = 0.0;
-    if (!parseFilterNumber(actual, left) || !parseFilterNumber(expected, right)) return false;
+    if (!parseFilterNumber(actual, left) || !parseFilterNumber(expected, right)) {
+      throw std::invalid_argument("numeric filter comparison requires numbers: " + expression);
+    }
     if (operation == ">=") return left >= right;
     if (operation == "<=") return left <= right;
     if (operation == ">") return left > right;
@@ -126,9 +145,9 @@ bool evaluateFilterExpression(const std::string& raw_expression, const std::map<
 
 }  // namespace
 
-bool matchesFilter(const std::string& expression, const std::map<std::string, std::string>& attributes)
+bool matchesFilter(const std::string& expression, const std::map<std::string, std::string>& attributes, bool regexp, bool nocase)
 {
-  return evaluateFilterExpression(expression, attributes);
+  return evaluateFilterExpression(expression, attributes, regexp, nocase);
 }
 
 }  // namespace ista::sdc

@@ -33,6 +33,7 @@ class TimingPathState
   std::string& get_start_point() { return _start_point; }
   std::string& get_predecessor() { return _predecessor; }
   std::string& get_clock_name() { return _clock_name; }
+  const std::string& get_capture_clock_name() const { return _capture_clock_name; }
   std::string& get_crpr_clock_pin() { return _crpr_clock_pin; }
   const std::string& get_path_state_tag() const { return _path_state_tag; }
   const std::string& get_predecessor_path_state_tag() const { return _predecessor_path_state_tag; }
@@ -51,6 +52,7 @@ class TimingPathState
   void set_start_point(const std::string_view start_point) { _start_point = start_point; }
   void set_predecessor(const std::string_view predecessor) { _predecessor = predecessor; }
   void set_clock_name(const std::string_view clock_name) { _clock_name = clock_name; }
+  void set_capture_clock_name(std::string_view clock_name) { _capture_clock_name = clock_name; }
   void set_crpr_clock_pin(const std::string_view crpr_clock_pin) { _crpr_clock_pin = crpr_clock_pin; }
   void set_path_state_tag(const std::string_view path_state_tag) { _path_state_tag = path_state_tag; }
   void set_predecessor_path_state_tag(const std::string_view path_state_tag) { _predecessor_path_state_tag = path_state_tag; }
@@ -71,6 +73,7 @@ class TimingPathState
   std::string _start_point;
   std::string _predecessor;
   std::string _clock_name;
+  std::string _capture_clock_name;
   std::string _crpr_clock_pin;
   std::string _path_state_tag;
   std::string _predecessor_path_state_tag;

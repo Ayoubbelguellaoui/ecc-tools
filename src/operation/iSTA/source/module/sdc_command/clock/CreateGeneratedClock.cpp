@@ -59,9 +59,8 @@ unsigned TclCreateGeneratedClock::exec()
     setTclError("invalid generated clock source or targets");
     return 0;
   }
-  if (getOptionOrArg("-add")->is_set_val()
-      && (!getOptionOrArg("-name")->is_set_val() || !getOptionOrArg("-master_clock")->is_set_val())) {
-    setTclError("create_generated_clock -add requires -name and -master_clock");
+  if (getOptionOrArg("-add")->is_set_val() && !getOptionOrArg("-name")->is_set_val()) {
+    setTclError("create_generated_clock -add requires -name");
     return 0;
   }
   const std::string name = getOptionOrArg("-name")->is_set_val() ? getOptionOrArg("-name")->getStringVal() : targets.front();
@@ -103,12 +102,21 @@ unsigned TclCreateGeneratedClock::exec()
     master_rise = master_fall;
     master_fall = old_rise + master_period;
   }
+  if (getOptionOrArg("-invert")->is_set_val() && getOptionOrArg("-preinvert")->is_set_val()) {
+    setTclError("-invert and -preinvert are mutually exclusive");
+    return 0;
+  }
   int transformations = 0;
-  for (const char* option : {"-divide_by", "-multiply_by", "-edges", "-combinational"}) {
+  for (const char* option : {"-divide_by", "-multiply_by", "-edges"}) {
     transformations += getOptionOrArg(option)->is_set_val();
   }
   if (transformations > 1) {
     setTclError("generated clock transformations are mutually exclusive");
+    return 0;
+  }
+  if (getOptionOrArg("-combinational")->is_set_val()
+      && (!getOptionOrArg("-divide_by")->is_set_val() || getOptionOrArg("-divide_by")->getDoubleVal() != 1.0)) {
+    setTclError("-combinational requires -divide_by 1");
     return 0;
   }
   double period = master_period;
@@ -148,8 +156,8 @@ unsigned TclCreateGeneratedClock::exec()
     }
     std::vector<double> times;
     for (std::size_t i = 0; i < 3; ++i) {
-      if (!std::isfinite(edges[i]) || edges[i] < 1 || edges[i] != std::floor(edges[i]) || (i && edges[i] <= edges[i - 1])) {
-        setTclError("-edges requires three increasing positive integers");
+      if (!std::isfinite(edges[i]) || edges[i] < 1 || edges[i] != std::floor(edges[i]) || (i && edges[i] < edges[i - 1])) {
+        setTclError("-edges requires three nondecreasing positive integers");
         return 0;
       }
       const double index = edges[i] - 1;
@@ -175,7 +183,7 @@ unsigned TclCreateGeneratedClock::exec()
     rise = fall;
     fall = old_rise + period;
   }
-  if (!std::isfinite(period) || !std::isfinite(rise) || !std::isfinite(fall) || period <= 0 || fall <= rise || fall >= rise + period) {
+  if (!std::isfinite(period) || !std::isfinite(rise) || !std::isfinite(fall) || period <= 0 || fall < rise || fall >= rise + period) {
     setTclError("invalid generated clock waveform");
     return 0;
   }
@@ -184,6 +192,20 @@ unsigned TclCreateGeneratedClock::exec()
   generated.set_master_clock_name(master_name);
   generated.set_master_source(sources.front());
   generated.set_source_list(targets);
+  GeneratedClockDefinition definition;
+  definition.master_clock = master_name;
+  definition.master_source = sources.front();
+  definition.targets = targets;
+  if (getOptionOrArg("-divide_by")->is_set_val()) definition.divide_by = getOptionOrArg("-divide_by")->getDoubleVal();
+  if (getOptionOrArg("-multiply_by")->is_set_val()) definition.multiply_by = getOptionOrArg("-multiply_by")->getDoubleVal();
+  if (getOptionOrArg("-duty_cycle")->is_set_val()) definition.duty_cycle = getOptionOrArg("-duty_cycle")->getDoubleVal();
+  if (getOptionOrArg("-edges")->is_set_val()) definition.edges = getOptionOrArg("-edges")->getDoubleList();
+  if (getOptionOrArg("-edge_shift")->is_set_val()) definition.edge_shifts = getOptionOrArg("-edge_shift")->getDoubleList();
+  definition.invert = getOptionOrArg("-invert")->is_set_val();
+  definition.preinvert = getOptionOrArg("-preinvert")->is_set_val();
+  definition.combinational = getOptionOrArg("-combinational")->is_set_val();
+  definition.add = getOptionOrArg("-add")->is_set_val();
+  generated.set_generated_clock_definition(std::move(definition));
   generated.set_period(period);
   generated.set_rise_edge(rise);
   generated.set_fall_edge(fall);

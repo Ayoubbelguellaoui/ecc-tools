@@ -30,11 +30,11 @@ unsigned TclGetPorts::exec()
 {
   ecc::TclOption* objects = getOptionOrArg("ports");
   const ObjectQueryOptions options = getObjectQueryOptions(*this);
+  if (const auto error = getObjectQueryError(options, objects->is_set_val())) return setTclError("get_ports " + *error), 0;
   const std::string patterns = objects->is_set_val() ? objects->getStringVal() : "*";
   std::vector<std::string> result = findObjects(STADM.getDatabase(), parseObjectPatterns(patterns, options.regexp), QueryObjectType::kPort, options);
   if (result.empty() && !getOptionOrArg("-quiet")->is_set_val()) {
-    setTclError("no ports matched: " + patterns);
-    return 0;
+    warn("no ports matched: " + patterns);
   }
   setResult(std::move(result));
   return 1;

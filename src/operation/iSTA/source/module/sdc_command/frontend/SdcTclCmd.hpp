@@ -32,6 +32,7 @@ class SdcTclCmd : public ecc::TclCmd
  protected:
   void setOptionValue(ecc::TclOption* option, const char* value);
   void setTclError(std::string error_message) { _error_message = std::move(error_message); }
+  void warn(const std::string& message) const;
   void setResult(std::string result);
   void setResult(std::vector<std::string> result);
   const std::vector<std::pair<std::string, std::string>>& getOptionValueList() const { return _option_value_list; }

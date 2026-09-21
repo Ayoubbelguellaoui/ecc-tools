@@ -29,6 +29,9 @@ enum class QueryObjectType
   kCell,
   kNet,
   kClock,
+  kLibrary,
+  kLibCell,
+  kLibPin,
   kAny
 };
 
@@ -55,5 +58,6 @@ std::vector<std::string> getFullNames(Database& database, const std::string& obj
 TimingPortConstraint& getOrCreatePortConstraint(Database& database, const std::string& port_name);
 void addObjectQueryOptions(SdcTclCmd& command, bool hierarchical, bool exact, bool of_objects);
 ObjectQueryOptions getObjectQueryOptions(SdcTclCmd& command);
+std::optional<std::string> getObjectQueryError(const ObjectQueryOptions& options, bool has_patterns);
 
 }  // namespace ista::sdc

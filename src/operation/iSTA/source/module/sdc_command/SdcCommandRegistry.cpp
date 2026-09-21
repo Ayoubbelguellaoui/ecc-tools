@@ -50,6 +50,13 @@ void registerObjectQueryCommands(SdcCommand& interpreter)
   registerCommand<TclGetFullName>(interpreter, "get_object_name");
   registerCommand<TclGetClocks>(interpreter, "get_clock");
   registerCommand<TclGetClocks>(interpreter, "get_clocks");
+  registerCommand<TclGetGeneratedClocks>(interpreter, "get_generated_clocks");
+  registerCommand<TclGetLibs>(interpreter, "get_lib");
+  registerCommand<TclGetLibs>(interpreter, "get_libs");
+  registerCommand<TclGetLibCells>(interpreter, "get_lib_cell");
+  registerCommand<TclGetLibCells>(interpreter, "get_lib_cells");
+  registerCommand<TclGetLibPins>(interpreter, "get_lib_pin");
+  registerCommand<TclGetLibPins>(interpreter, "get_lib_pins");
   registerCommand<TclGetPorts>(interpreter, "get_port");
   registerCommand<TclGetPorts>(interpreter, "get_ports");
   registerCommand<TclGetCells>(interpreter, "get_cell");

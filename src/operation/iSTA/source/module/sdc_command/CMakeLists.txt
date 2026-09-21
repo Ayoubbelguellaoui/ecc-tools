@@ -12,6 +12,10 @@ add_library(ista_sdc_command
     ${ISTA_MODULE}/sdc_command/object/CurrentDesign.cpp
     ${ISTA_MODULE}/sdc_command/object/GetCells.cpp
     ${ISTA_MODULE}/sdc_command/object/GetClocks.cpp
+    ${ISTA_MODULE}/sdc_command/object/GetGeneratedClocks.cpp
+    ${ISTA_MODULE}/sdc_command/object/GetLibCells.cpp
+    ${ISTA_MODULE}/sdc_command/object/GetLibPins.cpp
+    ${ISTA_MODULE}/sdc_command/object/GetLibs.cpp
     ${ISTA_MODULE}/sdc_command/object/GetNets.cpp
     ${ISTA_MODULE}/sdc_command/object/GetObjectNames.cpp
     ${ISTA_MODULE}/sdc_command/object/GetPins.cpp
