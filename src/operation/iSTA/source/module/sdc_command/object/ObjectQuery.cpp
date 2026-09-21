@@ -89,6 +89,29 @@ std::string escapeGlobBrackets(const std::string& pattern)
 std::vector<ObjectMatch> collectObjectMatches(Database& database, QueryObjectType type)
 {
   std::vector<ObjectMatch> matches;
+  TimingLibrary& library = database.get_timing_library();
+  if (type == QueryObjectType::kLibrary || type == QueryObjectType::kAny) {
+    std::set<std::string> names(library.get_library_name_list().begin(), library.get_library_name_list().end());
+    for (auto& [cell_name, cell] : library.get_cell_map()) names.insert(cell.get_library_name());
+    for (const std::string& name : names) addObjectMatch(matches, name, name, "library");
+  }
+  if (type == QueryObjectType::kLibCell || type == QueryObjectType::kAny) {
+    for (auto& [cell_name, cell] : library.get_cell_map()) {
+      const std::string full_name = cell.get_library_name() + "/" + cell_name;
+      addObjectMatch(matches, full_name, full_name, "lib_cell", {{"area", std::to_string(cell.get_area())},
+                                                                   {"is_sequential", cell.get_is_sequential() ? "true" : "false"}});
+    }
+  }
+  if (type == QueryObjectType::kLibPin || type == QueryObjectType::kAny) {
+    for (auto& [cell_name, cell] : library.get_cell_map()) {
+      for (auto& [pin_name, pin] : cell.get_port_map()) {
+        const std::string full_name = cell.get_library_name() + "/" + cell_name + "/" + pin_name;
+        addObjectMatch(matches, full_name, full_name, "lib_pin", {{"direction", pin.get_is_input() ? "in" : pin.get_is_output() ? "out" : "internal"},
+                                                                    {"is_clock_pin", pin.get_is_clock() ? "true" : "false"}});
+        matches.back().names.push_back(cell_name + "/" + pin_name);
+      }
+    }
+  }
   if (type == QueryObjectType::kClock || type == QueryObjectType::kAny) {
     for (auto& [name, clock] : database.get_timing_constraint().get_clock_map()) {
       addObjectMatch(matches, name, name, "clock", {{"period", std::to_string(clock.get_period())},
@@ -132,6 +155,13 @@ QueryObjectType getObjectType(Database& database, const std::string& name)
   if (database.get_timing_constraint().get_clock_map().contains(name)) return QueryObjectType::kClock;
   if (database.get_instance_map().contains(name)) return QueryObjectType::kCell;
   if (database.get_net_map().contains(name)) return QueryObjectType::kNet;
+  for (auto& [cell_name, cell] : database.get_timing_library().get_cell_map()) {
+    const std::string lib_cell = cell.get_library_name() + "/" + cell_name;
+    if (name == lib_cell) return QueryObjectType::kLibCell;
+    if (name.rfind(lib_cell + "/", 0) == 0) return QueryObjectType::kLibPin;
+  }
+  if (std::find(database.get_timing_library().get_library_name_list().begin(), database.get_timing_library().get_library_name_list().end(), name)
+      != database.get_timing_library().get_library_name_list().end()) return QueryObjectType::kLibrary;
   return QueryObjectType::kAny;
 }
 
@@ -143,6 +173,29 @@ std::set<std::string> collectRelatedObjects(Database& database, const std::vecto
     for (const std::string& object_name : object_names) {
       const QueryObjectType source = getObjectType(database, object_name);
       if (source == target) result.insert(object_name);
+      if (source == QueryObjectType::kCell && target == QueryObjectType::kLibCell) {
+        Instance& instance = database.get_instance_map().at(object_name);
+        auto cell = database.get_timing_library().get_cell_map().find(instance.get_cell_name());
+        if (cell != database.get_timing_library().get_cell_map().end()) result.insert(cell->second.get_library_name() + "/" + cell->first);
+      }
+      if (source == QueryObjectType::kPin && target == QueryObjectType::kLibPin) {
+        Pin& pin = database.get_pin_map().at(object_name);
+        auto instance = database.get_instance_map().find(pin.get_instance_name());
+        if (instance != database.get_instance_map().end()) {
+          auto cell = database.get_timing_library().get_cell_map().find(instance->second.get_cell_name());
+          if (cell != database.get_timing_library().get_cell_map().end())
+            result.insert(cell->second.get_library_name() + "/" + cell->first + "/" + pin.get_pin_name());
+        }
+      }
+      if (source == QueryObjectType::kLibPin && target == QueryObjectType::kLibCell) result.insert(object_name.substr(0, object_name.rfind('/')));
+      if (source == QueryObjectType::kLibCell && target == QueryObjectType::kLibrary) result.insert(object_name.substr(0, object_name.find('/')));
+      if (source == QueryObjectType::kLibCell && target == QueryObjectType::kLibPin) {
+        const std::size_t slash = object_name.find('/');
+        const std::string cell_name = object_name.substr(slash + 1);
+        auto cell = database.get_timing_library().get_cell_map().find(cell_name);
+        if (cell != database.get_timing_library().get_cell_map().end())
+          for (auto& [pin_name, pin] : cell->second.get_port_map()) result.insert(object_name + "/" + pin_name);
+      }
       if (source == QueryObjectType::kPin || source == QueryObjectType::kPort) {
         Pin& pin = database.get_pin_map().at(object_name);
         if (target == QueryObjectType::kCell && !pin.get_instance_name().empty()) result.insert(pin.get_instance_name());
@@ -231,7 +284,8 @@ std::vector<std::string> findObjects(Database& database, const std::vector<std::
   std::set<std::string> found;
 
   auto isEligible = [&](const ObjectMatch& candidate) {
-    return (options.of_objects.empty() || of_objects.contains(candidate.object_name)) && matchesFilter(options.filter, candidate.attributes);
+    return (options.of_objects.empty() || of_objects.contains(candidate.object_name))
+           && matchesFilter(options.filter, candidate.attributes, options.regexp, options.nocase);
   };
   auto matches = [&](const ObjectMatch& candidate, const std::string& pattern, bool escape_brackets) {
     for (std::size_t index = 0; index < candidate.names.size(); ++index) {
@@ -432,6 +486,15 @@ ObjectQueryOptions getObjectQueryOptions(SdcTclCmd& command)
     options.of_objects = objects->getStringList();
   }
   return options;
+}
+
+std::optional<std::string> getObjectQueryError(const ObjectQueryOptions& options, bool has_patterns)
+{
+  if (options.regexp && options.exact) return "-regexp and -exact are mutually exclusive";
+  if (options.nocase && !options.regexp) return "-nocase requires -regexp";
+  if (has_patterns && !options.of_objects.empty()) return "patterns and -of_objects are mutually exclusive";
+  if (options.hierarchical && !options.of_objects.empty()) return "-hierarchical and -of_objects are mutually exclusive";
+  return std::nullopt;
 }
 
 }  // namespace ista::sdc

@@ -24,18 +24,17 @@ TclGetCells::TclGetCells(const char* cmd_name, ClientData client_data) : SdcTclC
 {
   addOption(new ecc::TclStringOption("cells", 1));
   addObjectQueryOptions(*this, true, true, true);
-  addOption(new ecc::TclStringOption("-hsc", 0));
 }
 
 unsigned TclGetCells::exec()
 {
   ecc::TclOption* objects = getOptionOrArg("cells");
   const ObjectQueryOptions options = getObjectQueryOptions(*this);
+  if (const auto error = getObjectQueryError(options, objects->is_set_val())) return setTclError("get_cells " + *error), 0;
   const std::string patterns = objects->is_set_val() ? objects->getStringVal() : "*";
   std::vector<std::string> result = findObjects(STADM.getDatabase(), parseObjectPatterns(patterns, options.regexp), QueryObjectType::kCell, options);
   if (result.empty() && !getOptionOrArg("-quiet")->is_set_val()) {
-    setTclError("no cells matched: " + patterns);
-    return 0;
+    warn("no cells matched: " + patterns);
   }
   setResult(std::move(result));
   return 1;

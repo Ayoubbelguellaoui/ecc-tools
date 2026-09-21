@@ -30,11 +30,11 @@ unsigned TclGetClocks::exec()
 {
   ecc::TclOption* objects = getOptionOrArg("clocks");
   const ObjectQueryOptions options = getObjectQueryOptions(*this);
+  if (const auto error = getObjectQueryError(options, false)) return setTclError("get_clocks " + *error), 0;
   const std::string patterns = objects->is_set_val() ? objects->getStringVal() : "*";
   std::vector<std::string> result = findObjects(STADM.getDatabase(), parseObjectPatterns(patterns, options.regexp), QueryObjectType::kClock, options);
   if (result.empty() && !getOptionOrArg("-quiet")->is_set_val()) {
-    setTclError("no clocks matched: " + patterns);
-    return 0;
+    warn("no clocks matched: " + patterns);
   }
   setResult(std::move(result));
   return 1;

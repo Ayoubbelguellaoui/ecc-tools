@@ -16,6 +16,8 @@
 // ***************************************************************************************
 #include "SdcTclCmd.hpp"
 
+#include "Logger.hpp"
+
 namespace ista::sdc {
 
 SdcTclCmd::SdcTclCmd(const char* cmd_name, ClientData client_data) : ecc::TclCmd(cmd_name), _client_data(client_data)
@@ -114,6 +116,11 @@ void SdcTclCmd::setOptionValue(ecc::TclOption* option, const char* value)
     return;
   }
   option->setVal(value);
+}
+
+void SdcTclCmd::warn(const std::string& message) const
+{
+  STALOG.warn(Loc::current(), message);
 }
 
 void SdcTclCmd::setResult(std::string result)

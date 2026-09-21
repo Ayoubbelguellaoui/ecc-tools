@@ -99,4 +99,35 @@ class TclGetClocks : public SdcTclCmd
   unsigned exec() override;
 };
 
+class TclGetGeneratedClocks : public TclGetClocks
+{
+ public:
+  TclGetGeneratedClocks(const char* cmd_name, ClientData client_data);
+  unsigned exec() override;
+};
+
+class TclGetLibs : public SdcTclCmd
+{
+ public:
+  TclGetLibs(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclGetLibCells : public SdcTclCmd
+{
+ public:
+  TclGetLibCells(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
+class TclGetLibPins : public SdcTclCmd
+{
+ public:
+  TclGetLibPins(const char* cmd_name, ClientData client_data);
+  unsigned check() override { return 1; }
+  unsigned exec() override;
+};
+
 }  // namespace ista::sdc

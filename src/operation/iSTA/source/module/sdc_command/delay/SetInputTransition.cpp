@@ -36,6 +36,9 @@ unsigned TclSetInputTransition::exec()
 {
   auto& data_manager = DataManager::getInst();
 
+  if (getOptionOrArg("-clock")->is_set_val()) warn("set_input_transition -clock is deprecated and ignored");
+  if (getOptionOrArg("-clock_fall")->is_set_val()) warn("set_input_transition -clock_fall is deprecated and ignored");
+
   ecc::TclOption* transition_option = getOptionOrArg("transition");
   ecc::TclOption* object_option = getOptionOrArg("objects");
   if (!transition_option->is_set_val() || !object_option->is_set_val()) {

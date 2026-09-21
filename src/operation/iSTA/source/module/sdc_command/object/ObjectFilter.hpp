@@ -16,6 +16,6 @@
 namespace ista::sdc {
 
 // Evaluate the SDC -filter expression against attributes collected for one object.
-bool matchesFilter(const std::string& expression, const std::map<std::string, std::string>& attributes);
+bool matchesFilter(const std::string& expression, const std::map<std::string, std::string>& attributes, bool regexp = false, bool nocase = false);
 
 }  // namespace ista::sdc

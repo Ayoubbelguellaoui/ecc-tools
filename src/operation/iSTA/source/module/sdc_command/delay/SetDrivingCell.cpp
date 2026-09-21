@@ -29,16 +29,22 @@ TclSetDrivingCell::TclSetDrivingCell(const char* cmd_name, ClientData client_dat
   addOption(new ecc::TclStringOption("-from_pin", 0));
   addOption(new ecc::TclDoubleOption("-input_transition_rise", 0));
   addOption(new ecc::TclDoubleOption("-input_transition_fall", 0));
+  addOption(new ecc::TclDoubleOption("-multiply_by", 0));
   addOption(new ecc::TclSwitchOption("-rise"));
   addOption(new ecc::TclSwitchOption("-fall"));
   addOption(new ecc::TclSwitchOption("-min"));
   addOption(new ecc::TclSwitchOption("-max"));
   addOption(new ecc::TclSwitchOption("-no_design_rule"));
+  addOption(new ecc::TclSwitchOption("-dont_scale"));
   addOption(new ecc::TclStringListOption("objects", 1));
 }
 
 unsigned TclSetDrivingCell::exec()
 {
+  if (getOptionOrArg("-multiply_by")->is_set_val()) warn("set_driving_cell -multiply_by is accepted for compatibility and ignored");
+  if (getOptionOrArg("-dont_scale")->is_set_val()) warn("set_driving_cell -dont_scale is accepted for compatibility and ignored");
+  if (getOptionOrArg("-no_design_rule")->is_set_val()) warn("set_driving_cell -no_design_rule is accepted for compatibility and ignored");
+
   ecc::TclOption* cell_option = getOptionOrArg("-lib_cell");
   ecc::TclOption* cell_alias_option = getOptionOrArg("-cell");
   if (!cell_option->is_set_val() && cell_alias_option->is_set_val()) {
