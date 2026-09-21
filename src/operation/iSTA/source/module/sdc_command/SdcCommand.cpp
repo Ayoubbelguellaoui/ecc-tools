@@ -34,7 +34,7 @@ namespace {
 // search paths compiled into libtcl only exist on RHEL-like distros (Debian
 // uses /usr/share/tcltk). Returns an empty path for unpackaged builds, where
 // the system paths apply.
-std::filesystem::path findBundledTclLibrary()
+std::filesystem::path getBundledTclLibrary()
 {
 #ifndef _WIN32
   namespace fs = std::filesystem;
@@ -51,12 +51,11 @@ std::filesystem::path findBundledTclLibrary()
 #endif
 }
 
-void importScreenConstraintVariables(Tcl_Interp* interp)
+void setScreenVariables(Tcl_Interp* interp)
 {
-  // The William MCU screening SDC intentionally uses Tcl globals so the same
-  // file can be sourced by PrimeTime, OpenSTA, or iSTA.  Import the documented
-  // environment overrides into the embedded interpreter and clear values left
-  // by a previous in-process STA run.
+  // The screening SDC uses Tcl globals. Import the documented environment
+  // overrides into the embedded interpreter and clear values left by a
+  // previous in-process STA run.
   for (const char* name : {"MCU_MHZ", "MCU_VIEW"}) {
     Tcl_UnsetVar(interp, name, TCL_GLOBAL_ONLY);
     Tcl_ResetResult(interp);
@@ -94,7 +93,7 @@ SdcCommand::SdcCommand()
   // An explicit TCL_LIBRARY always wins; only fall back to the bundled
   // scripts when the user has not chosen a script library themselves.
   if (std::getenv("TCL_LIBRARY") == nullptr) {
-    const std::filesystem::path bundled_library = findBundledTclLibrary();
+    const std::filesystem::path bundled_library = getBundledTclLibrary();
     if (!bundled_library.empty()) {
       Tcl_SetVar(_interp, "tcl_library", bundled_library.string().c_str(), TCL_GLOBAL_ONLY);
     }
@@ -146,7 +145,7 @@ int SdcCommand::evalScriptFile(const std::string& file_name)
   }
 
   const std::string script((std::istreambuf_iterator<char>(script_file)), std::istreambuf_iterator<char>());
-  importScreenConstraintVariables(_interp);
+  setScreenVariables(_interp);
   return evalScript(script);
 }
 

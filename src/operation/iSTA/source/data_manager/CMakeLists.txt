@@ -15,5 +15,5 @@ target_include_directories(ista_data_manager
     ${ISTA_DATA_MANAGER}/basic
     ${ISTA_DATA_MANAGER}
     ${ISTA_DATA_MANAGER}/constraint
-    ${ISTA_MODULE}/sdc_command/sdc_commands
+    ${ISTA_MODULE}/sdc_command
 )
