@@ -43,9 +43,9 @@ jobs:
           while read -r sha; do
             git log -1 --format=%B "$sha" > "$msg_file"
             echo "Checking commit $(git log -1 --format='%h %s' "$sha")"
-            uvx prek@0.2.30 run --hook-stage commit-msg --commit-msg-filename "$msg_file"
+            uvx prek@0.2.30 run --config .pre-commit-config.yaml --hook-stage commit-msg --commit-msg-filename "$msg_file"
           done < <(git log --format=%H "origin/$BASE_REF..HEAD")
 
           printf '%s\n' "$TITLE" > "$msg_file"
           echo "Checking PR title: $TITLE"
-          uvx prek@0.2.30 run --hook-stage commit-msg --commit-msg-filename "$msg_file"
+          uvx prek@0.2.30 run --config .pre-commit-config.yaml --hook-stage commit-msg --commit-msg-filename "$msg_file"

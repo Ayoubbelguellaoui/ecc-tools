@@ -30,7 +30,7 @@ Notes:
 
 List the commands you ran. Mark checks that are not applicable as N/A.
 
-- [ ] C++ formatting: `pre-commit run --files <changed C/C++ files>`
+- [ ] C++ formatting: `uvx prek run --config .pre-commit-config.yaml --files <changed C/C++ files>`
 - [ ] Native build: `bash build.sh` or an equivalent CMake command
 - [ ] Wheel build: `uv build --wheel --no-build-isolation --verbose`
 - [ ] Python API integration: `python -m pytest data operations -v --maxfail=1`

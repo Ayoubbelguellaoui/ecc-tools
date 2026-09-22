@@ -89,7 +89,7 @@ changed surface:
 
 ```bash
 # C/C++ formatting for changed files
-uvx prek run --files path/to/changed/file.cpp path/to/changed/header.h
+uvx prek run --config .pre-commit-config.yaml --files path/to/changed/file.cpp path/to/changed/header.h
 
 # Native build (requires the documented compiler and system dependencies)
 bash build.sh

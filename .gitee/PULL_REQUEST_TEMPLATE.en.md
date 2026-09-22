@@ -25,7 +25,7 @@ Notes:
 
 ## Validation
 
-- [ ] C/C++ formatting: `pre-commit run --files <changed files>`
+- [ ] C/C++ formatting: `uvx prek run --config .pre-commit-config.yaml --files <changed files>`
 - [ ] Native build: `bash build.sh` or equivalent CMake command
 - [ ] Wheel build: `uv build --wheel --no-build-isolation --verbose`
 - [ ] Python API integration tests

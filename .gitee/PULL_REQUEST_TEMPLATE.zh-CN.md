@@ -25,7 +25,7 @@
 
 ## 验证
 
-- [ ] C/C++ 格式检查：`pre-commit run --files <变更文件>`
+- [ ] C/C++ 格式检查：`uvx prek run --config .pre-commit-config.yaml --files <变更文件>`
 - [ ] 原生构建：`bash build.sh` 或等价 CMake 命令
 - [ ] wheel 构建：`uv build --wheel --no-build-isolation --verbose`
 - [ ] Python API 集成测试
